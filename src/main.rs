@@ -1,14 +1,27 @@
 use std::collections::HashSet;
-use clap::{Arg, App};
+use std::path::Path;
 
 use async_std_resolver::{AsyncStdResolver, config, ResolveError, resolver};
 use async_std_resolver::lookup_ip::LookupIp;
+use clap::Parser;
 use exitfailure::ExitFailure;
 use futures::future::join_all;
 use reqwest::Error;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
+
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct ReconArgs {
+    /// Domain to be reconned
+    #[clap(short, long, value_parser)]
+    domain: String,
+
+    /// Words file for extending wildcard domains
+    #[clap(short, long, value_parser, default_value = "")]
+    file: String
+}
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -26,25 +39,9 @@ struct Certificate {
 
 #[tokio::main]
 async fn main() -> Result<(), ExitFailure> {
-    let matches = App::new("domain-recon")
-        .version("0.1.0")
-        .author("Ervin Szilagyi")
-        .about("Domain recon")
-        .arg(Arg::with_name("file")
-            .short('f')
-            .long("file")
-            .takes_value(true)
-            .help("Words file"))
-        .arg(Arg::with_name("domain")
-            .short('d')
-            .long("domain")
-            .takes_value(true)
-            .help("Domain to recon"))
-        .get_matches();
+    let args: ReconArgs = ReconArgs::parse();
 
-    let domain = matches.value_of("domain").unwrap();
-
-    let certificates = fetch_certificates(domain).await.unwrap();
+    let certificates = fetch_certificates(&args.domain).await.unwrap();
 
     let mut domains: HashSet<String> = HashSet::new();
     for certificate in certificates {
@@ -61,12 +58,20 @@ async fn main() -> Result<(), ExitFailure> {
     let resolver = resolver(
         config::ResolverConfig::default(),
         config::ResolverOpts::default(),
-    ).await.expect("failed to connect resolver");
+    ).await.expect("Failed to connect resolver!");
 
     pretty_print(&get_resolvable_domains(&domains, &resolver).await);
 
-    println!("\nExtended domains:");
-    pretty_print(&get_resolvable_domains(&extend_wildcards(&"src/words.txt".to_string(), &wildcards).await?, &resolver).await);
+    if !args.file.trim().is_empty() {
+        let words_path = Path::new(&args.file);
+        println!("\nExtended domains:");
+        match extend_wildcards(&words_path, &wildcards).await {
+            Ok(domains) => {
+                pretty_print(&get_resolvable_domains(&domains, &resolver).await);
+            }
+            Err(e) => println!("Error: {}", e)
+        }
+    }
 
     Ok(())
 }
@@ -82,16 +87,16 @@ async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, Error> {
     }
 }
 
-async fn extend_wildcards(words_path: &String, wildcards: &HashSet<&String>) -> Result<HashSet<String>, io::Error> {
+async fn extend_wildcards(words_path: &Path, wildcards: &HashSet<&String>) -> Result<HashSet<String>, io::Error> {
     let mut potential_domains: HashSet<String> = HashSet::new();
     let mut lines = BufReader::new(File::open(words_path).await?).lines();
     while let Some(line) = lines.next_line().await? {
         let word = line.trim();
         potential_domains.extend(wildcards.iter()
-            .map(|domain| { domain.replace("*", word) })
+            .map(|domain| domain.replace("*", word))
             .collect::<HashSet<String>>());
     }
-    Ok(potential_domains)
+    return Ok(potential_domains);
 }
 
 async fn get_resolvable_domains(domains: &HashSet<String>, resolver: &AsyncStdResolver) -> Vec<LookupIp> {
