@@ -20,7 +20,11 @@ struct ReconArgs {
 
     /// Words file for extending wildcard domains
     #[clap(short, long, value_parser, default_value = "")]
-    file: String
+    file: String,
+
+    /// Display results in plain form
+    #[clap(short, long, action)]
+    plain: bool
 }
 
 #[allow(dead_code)]
@@ -60,14 +64,16 @@ async fn main() -> Result<(), ExitFailure> {
         config::ResolverOpts::default(),
     ).await.expect("Failed to connect resolver!");
 
-    pretty_print(&get_resolvable_domains(&domains, &resolver).await);
+    pretty_print(&get_resolvable_domains(&domains, &resolver).await, args.plain);
 
     if !args.file.trim().is_empty() {
         let words_path = Path::new(&args.file);
-        println!("\nExtended domains:");
+        if !args.plain {
+            println!("\nExtended domains:");
+        }
         match extend_wildcards(&words_path, &wildcards).await {
             Ok(domains) => {
-                pretty_print(&get_resolvable_domains(&domains, &resolver).await);
+                pretty_print(&get_resolvable_domains(&domains, &resolver).await, args.plain);
             }
             Err(e) => println!("Error: {}", e)
         }
@@ -110,9 +116,15 @@ async fn get_resolvable_domains(domains: &HashSet<String>, resolver: &AsyncStdRe
         .collect::<Vec<LookupIp>>()
 }
 
-fn pretty_print(domains: &Vec<LookupIp>) {
+fn pretty_print(domains: &Vec<LookupIp>, plain: bool) {
     for lookup in domains {
         let records = lookup.iter().map(|record| record.to_string()).collect::<Vec<String>>();
+        if plain {
+            for record in records {
+                println!("{}", record);
+            }
+            continue;
+        }
         println!("{} {} {}", lookup.query().name(), lookup.query().query_type(), records.join(", "));
     }
 }
