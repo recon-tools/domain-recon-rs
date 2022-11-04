@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'domain-recon-rs'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=domain-recon-rs",
+                    "--package=domain-recon-rs"
+                ],
+                "filter": {
+                    "name": "domain-recon-rs",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--domain", "websitexpo.com"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'domain-recon-rs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=domain-recon-rs",
+                    "--package=domain-recon-rs"
+                ],
+                "filter": {
+                    "name": "domain-recon-rs",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

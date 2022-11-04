@@ -16,9 +16,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          target: aarch64-apple-darwin
-          profile: minimal
-          default: true
+          targets: aarch64-apple-darwin
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
       - name: Build
@@ -55,8 +53,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
-          profile: minimal
-          default: true
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
       - name: Build
