@@ -1,14 +1,23 @@
-[package]
-name = "domain-recon-rs"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "crates/cli",
+    "crates/recon",
+]
 
-[dependencies]
-serde = { version = "1.0", features = ["derive"] }
-reqwest = { version = "0.11", features = ["json", "native-tls-vendored"] }
-tokio = { version = "1.0.2", features = ["full"] }
-exitfailure = "0.5.1"
-futures = "0.3.24"
-async-std-resolver = "0.22.0"
-clap = { version = "4.0.18", features = ["derive"] }
-csv = "1.1.6"
+[workspace.package]
+version = "0.1.0"
+authors = ["Ervin Szilagyi"]
+edition = "2021"
+license = "MIT"
+homepage = "https://github.com/domain-recon/domain-recon-rs"
+repository = "https://github.com/domain-recon/domain-recon-rs"
+keywords = ["domain", "recon"]
+description = "Cargo subcommand to work with AWS Lambda"
+rust-version = "1.64.0"
+
+[workspace.dependencies]
+recon = {version = "0.1.0", path = "crates/recon"}
+
+[profile.release]
+strip = "symbols"
+

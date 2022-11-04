@@ -23,7 +23,7 @@ jobs:
         uses: messense/maturin-action@v1
         with:
           maturin-version: ${{ env.MATURIN_VERSION }}
-          args: --release --out dist --strip --universal2
+          args: --release --out dist --strip --universal2 -m crates/cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -60,7 +60,7 @@ jobs:
         with:
           maturin-version: ${{ env.MATURIN_VERSION }}
           target: ${{ matrix.platform.target }}
-          args: --release --out dist --strip
+          args: --release --out dist --strip -m crates/cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
@@ -106,7 +106,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           manylinux: auto
           container: off
-          args: --release -o dist --strip
+          args: --release -o dist --strip -m crates/cli/Cargo.toml
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:

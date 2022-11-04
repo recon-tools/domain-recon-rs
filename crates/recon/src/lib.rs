@@ -4,34 +4,12 @@ use std::path::Path;
 
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{config, resolver, AsyncStdResolver, ResolveError};
-use clap::Parser;
 use csv::Writer;
-use exitfailure::ExitFailure;
 use futures::future::join_all;
 use futures::FutureExt;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
-
-#[derive(Parser, Debug)]
-#[clap(author, version, about, long_about = None)]
-struct ReconArgs {
-    /// Domain to be reconned
-    #[clap(short, long, value_parser)]
-    domain: String,
-
-    /// Words file for extending wildcard domains
-    #[clap(short, long, value_parser, default_value = "")]
-    file: String,
-
-    /// Display results in plain form
-    #[clap(short, long, action)]
-    plain: bool,
-
-    /// Save output to csv
-    #[clap(long, action)]
-    csv: bool,
-}
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -47,11 +25,8 @@ struct Certificate {
     serial_number: String,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), ExitFailure> {
-    let args: ReconArgs = ReconArgs::parse();
-
-    let certificates = fetch_certificates(&args.domain).await.unwrap();
+pub async fn run(domain: String, file: String, plain: bool, csv: bool) -> Result<(), ()> {
+    let certificates = fetch_certificates(&domain).await.unwrap();
 
     let mut domains: HashSet<String> = HashSet::new();
     for certificate in certificates {
@@ -74,25 +49,25 @@ async fn main() -> Result<(), ExitFailure> {
         config::ResolverConfig::default(),
         config::ResolverOpts::default(),
     )
-    .await
-    .expect("Failed to connect resolver!");
+        .await
+        .expect("Failed to connect resolver!");
 
-    let mut resolvable = get_resolvable_domains(&domains, &resolver, args.plain).await;
+    let mut resolvable = get_resolvable_domains(&domains, &resolver, plain).await;
 
-    if !args.file.trim().is_empty() {
-        let words_path = Path::new(&args.file);
-        if !args.plain {
+    if !file.trim().is_empty() {
+        let words_path = Path::new(&file);
+        if !plain {
             println!("\nExtended domains:");
         }
         match extend_wildcards(words_path, &wildcards).await {
             Ok(domains) => {
-                resolvable.extend(get_resolvable_domains(&domains, &resolver, args.plain).await);
+                resolvable.extend(get_resolvable_domains(&domains, &resolver, plain).await);
             }
             Err(e) => println!("Error: {}", e),
         }
     }
 
-    if args.csv {
+    if csv {
         write_to_csv(resolvable).expect("Error: could not output write to CSV file!");
     }
 

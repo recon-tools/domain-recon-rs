@@ -44,7 +44,7 @@ download.wikipedia.org A 91.198.174.192
 
 ## Building the Project
 
-This project requires Rust 1.63 or above.
+This project requires Rust 1.64 or above.
 
 ```bash
 cd domain-recon-rs
