@@ -1,0 +1,21 @@
+on:
+  pull_request:
+  push:
+    tags-ignore: [ 'v*' ]
+
+name: Rustfmt
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly
+            components: rustfmt
+            override: true
+      - uses: mbrobbel/rustfmt-check@master
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all
