@@ -4,7 +4,6 @@ use std::path::Path;
 
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{config, resolver, AsyncStdResolver, ResolveError};
-use csv::Writer;
 use futures::future::join_all;
 use futures::FutureExt;
 use serde::Deserialize;
@@ -25,7 +24,13 @@ struct Certificate {
     serial_number: String,
 }
 
-pub async fn run(domain: String, file: String, plain: bool, csv: bool) -> Result<(), ()> {
+pub struct DomainInfo {
+    pub name: String,
+    pub domain_type: String,
+    pub ip_addresses: Vec<String>,
+}
+
+pub async fn run(domain: String, file: String, plain: bool) -> Result<Vec<DomainInfo>, ()> {
     let certificates = fetch_certificates(&domain).await.unwrap();
 
     let mut domains: HashSet<String> = HashSet::new();
@@ -67,11 +72,22 @@ pub async fn run(domain: String, file: String, plain: bool, csv: bool) -> Result
         }
     }
 
-    if csv {
-        write_to_csv(resolvable).expect("Error: could not output write to CSV file!");
-    }
+    let result = resolvable
+        .iter()
+        .map(|lookup| {
+            let records = lookup
+                .iter()
+                .map(|record| record.to_string())
+                .collect::<Vec<String>>();
+            DomainInfo {
+                name: lookup.query().name().to_string(),
+                domain_type: lookup.query().query_type().to_string(),
+                ip_addresses: records,
+            }
+        })
+        .collect();
 
-    Ok(())
+    Ok(result)
 }
 
 async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
@@ -146,21 +162,4 @@ fn pretty_print(lookup: &LookupIp, plain: bool) {
         lookup.query().query_type(),
         records.join(", ")
     );
-}
-
-fn write_to_csv(domains: Vec<LookupIp>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::from_path("result.csv")?;
-    for lookup in domains {
-        let records = lookup
-            .iter()
-            .map(|record| record.to_string())
-            .collect::<Vec<String>>();
-        writer.write_record(&[
-            lookup.query().name().to_string(),
-            lookup.query().query_type().to_string(),
-            records.join(", "),
-        ])?;
-    }
-    writer.flush()?;
-    Ok(())
 }

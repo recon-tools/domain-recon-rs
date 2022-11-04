@@ -20,4 +20,3 @@ recon = {version = "0.1.0", path = "crates/recon"}
 
 [profile.release]
 strip = "symbols"
-
