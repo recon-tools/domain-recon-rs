@@ -1,0 +1,171 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  MATURIN_VERSION: 0.13.6
+
+jobs:
+  release-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          target: aarch64-apple-darwin
+          profile: minimal
+          default: true
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+      - name: Build
+        uses: messense/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          args: --release --out dist --strip --universal2
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: apple-darwin-${{ github.ref_name }}-bin
+          path: target/release/domain-recon-rs
+          if-no-files-found: error
+
+  release-windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        platform:
+          - arch: x64
+            target: x86_64-pc-windows-msvc
+          - arch: x86
+            target: i686-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          profile: minimal
+          default: true
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+      - name: Build
+        uses: messense/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          target: ${{ matrix.platform.target }}
+          args: --release --out dist --strip
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-${{ matrix.platform.arch }}-${{ github.ref_name }}-bin
+          path: target/${{ matrix.platform.target }}/release/domain-recon-rs.exe
+          if-no-files-found: error
+
+  release-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        platform: [
+          { target: "x86_64-unknown-linux-musl", image_tag: "x86_64-musl" },
+          { target: "i686-unknown-linux-musl", image_tag: "i686-musl" },
+          { target: "aarch64-unknown-linux-musl", image_tag: "aarch64-musl" },
+          { target: "armv7-unknown-linux-musleabihf", image_tag: "armv7-musleabihf" },
+          { target: "armv7-unknown-linux-musleabi", image_tag: "armv7-musleabi" },
+        ]
+    container:
+      image: calavera/rust-musl-cross:${{ matrix.platform.image_tag }}
+      env:
+        CFLAGS_armv7_unknown_linux_musleabihf: '-mfpu=vfpv3-d16'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Store git commit
+        run: |
+          echo "DOMAIN_RECON_RS_RELEASE_GIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform.target }}
+
+      - name: Build
+        uses: messense/maturin-action@v1
+        with:
+          maturin-version: ${{ env.MATURIN_VERSION }}
+          target: ${{ matrix.platform.target }}
+          manylinux: auto
+          container: off
+          args: --release -o dist --strip
+      - name: Upload wheels
+        uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: dist
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
+          path: target/${{ matrix.platform.target }}/release/domain-recon-rs
+          if-no-files-found: error
+
+  release-all:
+    name: Release all artifacts
+    runs-on: ubuntu-latest
+    needs: [ release-macos, release-windows, release-linux ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          path: target/github-release
+      - name: Create upload directory
+        run: |
+          mkdir -p target/upload
+
+      - name: Package Windows files
+        working-directory: target/github-release
+        run: |
+          make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x64
+          make -f ../../Makefile build-release-zip tag=${{ github.ref_name }} target=windows-x86
+
+      - name: Package MacOS files
+        working-directory: target/github-release
+        run: |
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=apple-darwin
+
+      - name: Package Linux files
+        working-directory: target/github-release
+        run: |
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=x86_64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=i686-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=aarch64-unknown-linux-musl
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabihf
+          make -f ../../Makefile build-release-tar tag=${{ github.ref_name }} target=armv7-unknown-linux-musleabi
+
+      - name: Move release files to upload
+        run: |
+          mkdir -p target/upload
+          mv target/github-release/*.tar.gz* target/upload
+          mv target/github-release/*.zip* target/upload
+          mv target/github-release/**/*.whl target/upload
+
+      - name: Upload binaries to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/upload/*
+          prerelease: ${{ contains(github.ref_name, '-pre') }}
+          generate_release_notes: true
