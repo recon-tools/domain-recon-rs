@@ -242,9 +242,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "4.0.18"
+version = "4.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "335867764ed2de42325fafe6d18b8af74ba97ee0c590fa016f157535b42ab04b"
+checksum = "8e67816e006b17427c9b4386915109b494fec2d929c63e3bd3561234cbf1bf1e"
 dependencies = [
  "atty",
  "bitflags",
@@ -275,15 +275,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
 dependencies = [
  "os_str_bytes",
-]
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "recon",
- "tokio",
 ]
 
 [[package]]
@@ -357,6 +348,16 @@ name = "data-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
+
+[[package]]
+name = "domain-recon"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "csv",
+ "recon",
+ "tokio",
+]
 
 [[package]]
 name = "encoding_rs"
@@ -1096,7 +1097,6 @@ version = "0.1.0"
 dependencies = [
  "async-std-resolver",
  "clap",
- "csv",
  "futures",
  "reqwest",
  "serde",

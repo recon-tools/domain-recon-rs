@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "domain-recon"
 readme = "../../README.md"
 rust-version.workspace = true
 version.workspace = true
@@ -15,3 +15,4 @@ description.workspace = true
 recon.workspace = true
 tokio = { version = "1.0.2", features = ["full"] }
 clap = { version = "4.0.18", features = ["derive"] }
+csv = "1.1.6"
