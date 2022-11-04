@@ -94,7 +94,6 @@ jobs:
       - name: Store git commit
         run: |
           echo "DOMAIN_RECON_RS_RELEASE_GIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
-          sudo apt install pkg-config
       - name: Cache cargo build
         uses: Swatinem/rust-cache@v2
         with:
