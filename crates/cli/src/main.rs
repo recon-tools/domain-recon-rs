@@ -28,4 +28,3 @@ async fn main() -> Result<(), ()> {
 
     run(args.domain, args.file, args.plain, args.csv).await
 }
-

@@ -49,8 +49,8 @@ pub async fn run(domain: String, file: String, plain: bool, csv: bool) -> Result
         config::ResolverConfig::default(),
         config::ResolverOpts::default(),
     )
-        .await
-        .expect("Failed to connect resolver!");
+    .await
+    .expect("Failed to connect resolver!");
 
     let mut resolvable = get_resolvable_domains(&domains, &resolver, plain).await;
 
