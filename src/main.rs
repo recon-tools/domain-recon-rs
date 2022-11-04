@@ -5,10 +5,10 @@ use std::path::Path;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{config, resolver, AsyncStdResolver, ResolveError};
 use clap::Parser;
+use csv::Writer;
 use exitfailure::ExitFailure;
 use futures::future::join_all;
 use futures::FutureExt;
-use reqwest::Error;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
@@ -30,7 +30,7 @@ struct ReconArgs {
 
     /// Save output to csv
     #[clap(long, action)]
-    csv: bool
+    csv: bool,
 }
 
 #[allow(dead_code)]
@@ -92,10 +92,14 @@ async fn main() -> Result<(), ExitFailure> {
         }
     }
 
+    if args.csv {
+        write_to_csv(resolvable).expect("Error: could not output write to CSV file!");
+    }
+
     Ok(())
 }
 
-async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, Error> {
+async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
     let client = reqwest::Client::new();
     let response = client
         .get("https://crt.sh")
@@ -126,21 +130,22 @@ async fn extend_wildcards(
 async fn get_resolvable_domains(
     domains: &HashSet<String>,
     resolver: &AsyncStdResolver,
-    plain: bool
+    plain: bool,
 ) -> Vec<LookupIp> {
     let futures = domains
         .iter()
-        .map(|domain| resolver.lookup_ip(domain)
-            .then(|r| {
+        .map(|domain| {
+            resolver.lookup_ip(domain).then(|r| {
                 // Display results as soon as they appear
                 future::ready(match r {
                     Ok(ip) => {
                         pretty_print(&ip, plain);
                         Ok(ip)
-                    },
-                    Err(e) => Err(e)
+                    }
+                    Err(e) => Err(e),
                 })
-            }))
+            })
+        })
         .collect::<Vec<_>>();
     let result: Vec<Result<LookupIp, ResolveError>> = join_all(futures).await;
     result
@@ -166,4 +171,21 @@ fn pretty_print(lookup: &LookupIp, plain: bool) {
         lookup.query().query_type(),
         records.join(", ")
     );
+}
+
+fn write_to_csv(domains: Vec<LookupIp>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut writer = Writer::from_path("result.csv")?;
+    for lookup in domains {
+        let records = lookup
+            .iter()
+            .map(|record| record.to_string())
+            .collect::<Vec<String>>();
+        writer.write_record(&[
+            lookup.query().name().to_string(),
+            lookup.query().query_type().to_string(),
+            records.join(", "),
+        ])?;
+    }
+    writer.flush()?;
+    Ok(())
 }
