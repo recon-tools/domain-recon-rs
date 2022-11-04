@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::future;
 use std::path::Path;
 
 use async_std_resolver::lookup_ip::LookupIp;
@@ -6,7 +7,7 @@ use async_std_resolver::{config, resolver, AsyncStdResolver, ResolveError};
 use clap::Parser;
 use exitfailure::ExitFailure;
 use futures::future::join_all;
-use futures::{future, FutureExt};
+use futures::FutureExt;
 use reqwest::Error;
 use serde::Deserialize;
 use tokio::fs::File;
@@ -26,6 +27,10 @@ struct ReconArgs {
     /// Display results in plain form
     #[clap(short, long, action)]
     plain: bool,
+
+    /// Save output to csv
+    #[clap(long, action)]
+    csv: bool
 }
 
 #[allow(dead_code)]
@@ -72,10 +77,7 @@ async fn main() -> Result<(), ExitFailure> {
     .await
     .expect("Failed to connect resolver!");
 
-    pretty_print(
-        &get_resolvable_domains(&domains, &resolver).await,
-        args.plain,
-    );
+    let mut resolvable = get_resolvable_domains(&domains, &resolver, args.plain).await;
 
     if !args.file.trim().is_empty() {
         let words_path = Path::new(&args.file);
@@ -84,10 +86,7 @@ async fn main() -> Result<(), ExitFailure> {
         }
         match extend_wildcards(words_path, &wildcards).await {
             Ok(domains) => {
-                pretty_print(
-                    &get_resolvable_domains(&domains, &resolver).await,
-                    args.plain,
-                );
+                resolvable.extend(get_resolvable_domains(&domains, &resolver, args.plain).await);
             }
             Err(e) => println!("Error: {}", e),
         }
@@ -127,10 +126,21 @@ async fn extend_wildcards(
 async fn get_resolvable_domains(
     domains: &HashSet<String>,
     resolver: &AsyncStdResolver,
+    plain: bool
 ) -> Vec<LookupIp> {
     let futures = domains
         .iter()
-        .map(|domain| resolver.lookup_ip(domain))
+        .map(|domain| resolver.lookup_ip(domain)
+            .then(|r| {
+                // Display results as soon as they appear
+                future::ready(match r {
+                    Ok(ip) => {
+                        pretty_print(&ip, plain);
+                        Ok(ip)
+                    },
+                    Err(e) => Err(e)
+                })
+            }))
         .collect::<Vec<_>>();
     let result: Vec<Result<LookupIp, ResolveError>> = join_all(futures).await;
     result
@@ -140,23 +150,20 @@ async fn get_resolvable_domains(
         .collect::<Vec<LookupIp>>()
 }
 
-fn pretty_print(domains: &Vec<LookupIp>, plain: bool) {
-    for lookup in domains {
-        let records = lookup
-            .iter()
-            .map(|record| record.to_string())
-            .collect::<Vec<String>>();
-        if plain {
-            for record in records {
-                println!("{}", record);
-            }
-            continue;
+fn pretty_print(lookup: &LookupIp, plain: bool) {
+    let records = lookup
+        .iter()
+        .map(|record| record.to_string())
+        .collect::<Vec<String>>();
+    if plain {
+        for record in &records {
+            println!("{}", record);
         }
-        println!(
-            "{} {} {}",
-            lookup.query().name(),
-            lookup.query().query_type(),
-            records.join(", ")
-        );
     }
+    println!(
+        "{} {} {}",
+        lookup.query().name(),
+        lookup.query().query_type(),
+        records.join(", ")
+    );
 }
