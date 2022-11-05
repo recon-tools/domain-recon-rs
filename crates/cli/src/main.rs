@@ -31,14 +31,16 @@ struct ReconArgs {
 async fn main() -> Result<(), ()> {
     let args: ReconArgs = ReconArgs::parse();
 
-    let result = run(args.domain, args.file, args.use_system_resolver, args.plain).await;
-
-    if args.csv {
-        if let Ok(domains) = result {
-            write_to_csv(&domains).expect("Error!");
+    match run(args.domain, args.file, args.use_system_resolver, args.plain).await {
+        Ok(domains) => {
+            if args.csv {
+                write_to_csv(&domains).unwrap();
+            }
+        }
+        Err(e) => {
+            println!("Runtime Error: {}", e)
         }
     }
-
     Ok(())
 }
 
