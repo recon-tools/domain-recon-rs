@@ -33,7 +33,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: apple-darwin-${{ github.ref_name }}-bin
-          path: target/release/domain-recon-rs
+          path: target/release/domain-recon
           if-no-files-found: error
 
   release-windows:
@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: windows-${{ matrix.platform.arch }}-${{ github.ref_name }}-bin
-          path: target/${{ matrix.platform.target }}/release/domain-recon-rs.exe
+          path: target/${{ matrix.platform.target }}/release/domain-recon.exe
           if-no-files-found: error
 
   release-linux:
@@ -116,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.platform.target }}-${{ github.ref_name }}-bin
-          path: target/${{ matrix.platform.target }}/release/domain-recon-rs
+          path: target/${{ matrix.platform.target }}/release/domain-recon
           if-no-files-found: error
 
   release-all:
