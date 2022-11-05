@@ -12,7 +12,7 @@ potential subdomains.
 ### Example of usage:
 
 ```bash
-domain-recon-rs -d wikipedia.org -f words.txt
+domain-recon -d wikipedia.org -f words.txt
 ```
 
 The output of this will look similar to this:

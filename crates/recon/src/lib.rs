@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::HashSet;
 use std::future;
 use std::path::Path;
@@ -49,8 +50,14 @@ pub async fn run(
     use_system_resolver: bool,
     plain: bool,
 ) -> Result<Vec<DomainInfo>, ()> {
+    if !plain {
+        println!("Fetching certificates...");
+    }
     let certificates = fetch_certificates(&domain).await.unwrap();
 
+    if !plain {
+        println!("Extracting domains....");
+    }
     let mut domains: HashSet<String> = HashSet::new();
     for certificate in certificates {
         domains.extend(
@@ -63,19 +70,18 @@ pub async fn run(
         domains.insert(certificate.common_name);
     }
 
-    let wildcards = domains
-        .iter()
-        .filter(|domain| domain.starts_with('*'))
-        .collect::<HashSet<&String>>();
+    let (wildcards, fqdns) = domains
+        .into_iter()
+        .partition(|domain| domain.starts_with('*'));
 
     let resolver = build_resolver(use_system_resolver).await.unwrap();
 
-    let mut resolvable = get_resolvable_domains(&domains, &resolver, plain).await;
+    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, plain).await;
 
     if !file.trim().is_empty() {
         let words_path = Path::new(&file);
         if !plain {
-            println!("\nExtended domains:");
+            println!("\nExpanding wildcards...");
         }
         match extend_wildcards(words_path, &wildcards).await {
             Ok(domains) => {
@@ -109,19 +115,12 @@ async fn build_resolver(use_system_resolver: bool) -> Result<AsyncStdResolver, R
     }
 
     // Add all the available nameservers to the resolver
-    let mut dns_cfg = config::ResolverConfig::cloudflare();
-    for ns in config::NameServerConfigGroup::google().to_vec() {
+    let mut dns_cfg = config::ResolverConfig::google();
+    for ns in config::NameServerConfigGroup::cloudflare().to_vec() {
         dns_cfg.add_name_server(ns);
     }
 
-    for ns in config::NameServerConfigGroup::quad9().to_vec() {
-        dns_cfg.add_name_server(ns);
-    }
-
-    // Set the number of concurrent executions to be the number of all nameservers
-    let mut resolver_cfg = config::ResolverOpts::default();
-    resolver_cfg.num_concurrent_reqs = dns_cfg.name_servers().len();
-
+    let resolver_cfg = config::ResolverOpts::default();
     let resolver = resolver(dns_cfg, resolver_cfg).await;
     resolver
 }
@@ -138,7 +137,7 @@ async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::E
 
 async fn extend_wildcards(
     words_path: &Path,
-    wildcards: &HashSet<&String>,
+    wildcards: &HashSet<String>,
 ) -> Result<HashSet<String>, io::Error> {
     let mut potential_domains: HashSet<String> = HashSet::new();
     let mut lines = BufReader::new(File::open(words_path).await?).lines();
@@ -159,22 +158,31 @@ async fn get_resolvable_domains(
     resolver: &AsyncStdResolver,
     plain: bool,
 ) -> Vec<LookupIp> {
-    let futures = domains
-        .iter()
-        .map(|domain| {
-            resolver.lookup_ip(domain).then(|r| {
-                // Display results as soon as they appear
-                future::ready(match r {
-                    Ok(ip) => {
-                        pretty_print(&ip, plain);
-                        Ok(ip)
-                    }
-                    Err(e) => Err(e),
+    let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
+
+    // Build chunks of records in order to avoid having to many opened connections.
+    let chunks = domains.into_iter().chunks(200);
+    for c in &chunks {
+        let futures = c
+            .into_iter()
+            .map(|domain| {
+                resolver.lookup_ip(domain).then(|r| {
+                    // Display results as soon as they appear
+                    future::ready(match r {
+                        Ok(ip) => {
+                            pretty_print(&ip, plain);
+                            Ok(ip)
+                        }
+                        Err(e) => {
+                            // println!("{:?}", e);
+                            Err(e)
+                        }
+                    })
                 })
             })
-        })
-        .collect::<Vec<_>>();
-    let result: Vec<Result<LookupIp, ResolveError>> = join_all(futures).await;
+            .collect::<Vec<_>>();
+        result.extend(join_all(futures).await);
+    }
     result
         .iter()
         .filter(|res| res.is_ok())
