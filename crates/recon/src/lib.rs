@@ -49,11 +49,12 @@ pub async fn run(
     file: String,
     use_system_resolver: bool,
     plain: bool,
-) -> Result<Vec<DomainInfo>, ()> {
+) -> Result<Vec<DomainInfo>, Box<dyn std::error::Error>> {
     if !plain {
         println!("Fetching certificates...");
     }
-    let certificates = fetch_certificates(&domain).await.unwrap();
+
+    let certificates = fetch_certificates(&domain).await?;
 
     if !plain {
         println!("Extracting domains....");
@@ -74,7 +75,7 @@ pub async fn run(
         .into_iter()
         .partition(|domain| domain.starts_with('*'));
 
-    let resolver = build_resolver(use_system_resolver).await.unwrap();
+    let resolver = build_resolver(use_system_resolver).await?;
 
     let mut resolvable = get_resolvable_domains(&fqdns, &resolver, plain).await;
 
@@ -83,11 +84,8 @@ pub async fn run(
         if !plain {
             println!("\nExpanding wildcards...");
         }
-        match extend_wildcards(words_path, &wildcards).await {
-            Ok(domains) => {
-                resolvable.extend(get_resolvable_domains(&domains, &resolver, plain).await);
-            }
-            Err(e) => println!("Error: {}", e),
+        if let Ok(domains) = extend_wildcards(words_path, &wildcards).await {
+            resolvable.extend(get_resolvable_domains(&domains, &resolver, plain).await);
         }
     }
 
@@ -132,7 +130,7 @@ async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::E
         .query(&[("q", domain), ("output", "json"), ("excluded", "expired")])
         .send()
         .await;
-    response.unwrap().json::<Vec<Certificate>>().await
+    response?.json::<Vec<Certificate>>().await
 }
 
 async fn extend_wildcards(
@@ -199,11 +197,12 @@ fn pretty_print(lookup: &LookupIp, plain: bool) {
         for record in &records {
             println!("{}", record);
         }
+    } else {
+        println!(
+            "{} {} {}",
+            lookup.query().name(),
+            lookup.query().query_type(),
+            records.join(", ")
+        );
     }
-    println!(
-        "{} {} {}",
-        lookup.query().name(),
-        lookup.query().query_type(),
-        records.join(", ")
-    );
 }
