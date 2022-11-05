@@ -1,12 +1,11 @@
 mod resolver;
+pub use self::resolver::DNSResolver;
 
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::future;
 use std::path::Path;
-use std::str::FromStr;
 
-use crate::resolver::DNSResolver;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -64,6 +63,7 @@ pub async fn run(
     if !plain {
         println!("Extracting domains....");
     }
+
     let mut domains: HashSet<String> = HashSet::new();
     for certificate in certificates {
         domains.extend(

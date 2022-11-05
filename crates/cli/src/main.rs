@@ -3,7 +3,6 @@ use csv::Writer;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use crate::resolver::DNSResolver;
 use recon::{run, DNSResolver, DomainInfo};
 
 #[derive(Parser, Debug)]
