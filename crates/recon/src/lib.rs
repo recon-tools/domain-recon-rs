@@ -3,7 +3,9 @@ use std::future;
 use std::path::Path;
 
 use async_std_resolver::lookup_ip::LookupIp;
-use async_std_resolver::{config, resolver, AsyncStdResolver, ResolveError};
+use async_std_resolver::{
+    config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
+};
 use futures::future::join_all;
 use futures::FutureExt;
 use serde::Deserialize;
@@ -24,13 +26,29 @@ struct Certificate {
     serial_number: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct DomainInfo {
     pub name: String,
     pub domain_type: String,
     pub ip_addresses: Vec<String>,
 }
 
-pub async fn run(domain: String, file: String, plain: bool) -> Result<Vec<DomainInfo>, ()> {
+impl DomainInfo {
+    pub fn new(name: String, domain_type: String, ip_addresses: Vec<String>) -> DomainInfo {
+        DomainInfo {
+            name,
+            domain_type,
+            ip_addresses,
+        }
+    }
+}
+
+pub async fn run(
+    domain: String,
+    file: String,
+    use_system_resolver: bool,
+    plain: bool,
+) -> Result<Vec<DomainInfo>, ()> {
     let certificates = fetch_certificates(&domain).await.unwrap();
 
     let mut domains: HashSet<String> = HashSet::new();
@@ -50,12 +68,7 @@ pub async fn run(domain: String, file: String, plain: bool) -> Result<Vec<Domain
         .filter(|domain| domain.starts_with('*'))
         .collect::<HashSet<&String>>();
 
-    let resolver = resolver(
-        config::ResolverConfig::default(),
-        config::ResolverOpts::default(),
-    )
-    .await
-    .expect("Failed to connect resolver!");
+    let resolver = build_resolver(use_system_resolver).await.unwrap();
 
     let mut resolvable = get_resolvable_domains(&domains, &resolver, plain).await;
 
@@ -79,15 +92,38 @@ pub async fn run(domain: String, file: String, plain: bool) -> Result<Vec<Domain
                 .iter()
                 .map(|record| record.to_string())
                 .collect::<Vec<String>>();
-            DomainInfo {
-                name: lookup.query().name().to_string(),
-                domain_type: lookup.query().query_type().to_string(),
-                ip_addresses: records,
-            }
+            DomainInfo::new(
+                lookup.query().name().to_string(),
+                lookup.query().query_type().to_string(),
+                records,
+            )
         })
         .collect();
 
     Ok(result)
+}
+
+async fn build_resolver(use_system_resolver: bool) -> Result<AsyncStdResolver, ResolveError> {
+    if use_system_resolver {
+        return resolver_from_system_conf().await;
+    }
+
+    // Add all the available nameservers to the resolver
+    let mut dns_cfg = config::ResolverConfig::cloudflare();
+    for ns in config::NameServerConfigGroup::google().to_vec() {
+        dns_cfg.add_name_server(ns);
+    }
+
+    for ns in config::NameServerConfigGroup::quad9().to_vec() {
+        dns_cfg.add_name_server(ns);
+    }
+
+    // Set the number of concurrent executions to be the number of all nameservers
+    let mut resolver_cfg = config::ResolverOpts::default();
+    resolver_cfg.num_concurrent_reqs = dns_cfg.name_servers().len();
+
+    let resolver = resolver(dns_cfg, resolver_cfg).await;
+    resolver
 }
 
 async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
