@@ -18,28 +18,25 @@ domain-recon -d wikipedia.org -f words.txt
 The output of this will look similar to this:
 
 ```bash
+Fetching certificates...
+Extracting domains....
 wikipedia.org A 91.198.174.192
 c.ssl.shopify.com A 23.227.38.74
 store.wikipedia.org A 91.198.174.192
 zero.wikipedia.org A 91.198.174.192
 m.wikipedia.org A 91.198.174.192
 
-Extended domains:
-m.wikipedia.org A 91.198.174.192
-store.wikipedia.org A 91.198.174.192
+Expanding wildcards...
+en.wikipedia.org A 91.198.174.192
+my.m.wikipedia.org A 91.198.174.192
+en.m.wikipedia.org A 91.198.174.192
+new.m.wikipedia.org A 91.198.174.192
+download.wikipedia.org A 91.198.174.192
+mail.wikipedia.org A 91.198.174.192
+test.wikipedia.org A 91.198.174.192
+www.wikipedia.org A 91.198.174.192
 new.wikipedia.org A 91.198.174.192
 stats.wikipedia.org A 91.198.174.192
-www.wikipedia.org A 91.198.174.192
-mail.wikipedia.org A 91.198.174.192
-my.wikipedia.org A 91.198.174.192
-test.wikipedia.org A 91.198.174.192
-en.m.wikipedia.org A 91.198.174.192
-my.m.wikipedia.org A 91.198.174.192
-new.m.wikipedia.org A 91.198.174.192
-test.m.wikipedia.org A 91.198.174.192
-shop.wikipedia.org A 91.198.174.192
-en.wikipedia.org A 91.198.174.192
-download.wikipedia.org A 91.198.174.192
 ```
 
 ## Building the Project

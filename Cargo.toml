@@ -5,7 +5,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Ervin Szilagyi"]
 edition = "2021"
 license = "MIT"
@@ -16,7 +16,8 @@ description = "Cargo subcommand to work with AWS Lambda"
 rust-version = "1.64.0"
 
 [workspace.dependencies]
-recon = {version = "0.2.0", path = "crates/recon"}
+recon = {version = "0.3.0", path = "crates/recon"}
+tokio = { version = "1.0.2" }
 
 [profile.release]
 strip = "symbols"

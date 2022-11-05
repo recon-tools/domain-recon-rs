@@ -8,7 +8,7 @@ use recon::{run, DNSResolver, DomainInfo};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct ReconArgs {
-    /// Domain to be reconned
+    /// Domain name to be scanned
     #[clap(short, long, value_parser)]
     domain: String,
 
@@ -55,7 +55,7 @@ async fn main() -> Result<(), ()> {
     let dns_resolver = match dns_input {
         Ok(r) => r,
         Err(e) => {
-            panic!("{}", e)
+            panic!("Input error: {}", e)
         }
     };
 
@@ -74,7 +74,7 @@ async fn main() -> Result<(), ()> {
             }
         }
         Err(e) => {
-            println!("Runtime Error: {}", e)
+            panic!("Runtime Error: {}", e)
         }
     }
     Ok(())

@@ -13,6 +13,6 @@ description.workspace = true
 
 [dependencies]
 recon.workspace = true
-tokio = { version = "1.0.2", features = ["full"] }
 clap = { version = "4.0.18", features = ["derive"] }
 csv = "1.1.6"
+tokio = { workspace = true, features = ["full"] }
