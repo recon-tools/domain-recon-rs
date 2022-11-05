@@ -21,13 +21,17 @@ struct ReconArgs {
     /// Save output to csv
     #[clap(long, action)]
     csv: bool,
+
+    /// Use default system resolver
+    #[clap(long, action, default_value = "false")]
+    use_system_resolver: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), ()> {
     let args: ReconArgs = ReconArgs::parse();
 
-    let result = run(args.domain, args.file, args.plain).await;
+    let result = run(args.domain, args.file, args.use_system_resolver, args.plain).await;
 
     if args.csv {
         if let Ok(domains) = result {
