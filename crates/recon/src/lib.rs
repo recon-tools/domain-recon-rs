@@ -1,5 +1,6 @@
 mod resolver;
 pub use self::resolver::DNSResolver;
+pub use self::resolver::UnknownDNSResolver;
 
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -53,7 +54,7 @@ pub async fn run(
     use_system_resolver: bool,
     dns_resolvers: Vec<DNSResolver>,
     plain: bool,
-) -> Result<Vec<DomainInfo>, Box<dyn std::error::Error>> {
+) -> Result<Vec<DomainInfo>, anyhow::Error> {
     if !plain {
         println!("Fetching certificates...");
     }

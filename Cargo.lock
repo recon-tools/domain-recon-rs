@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "anyhow"
+version = "1.0.66"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "216261ddc8289130e551ddcd5ce8a064710c0d064a4d2895c67151c92b5443f6"
+
+[[package]]
 name = "async-channel"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -353,6 +359,7 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 name = "domain-recon"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "clap",
  "csv",
  "recon",
@@ -1110,6 +1117,7 @@ dependencies = [
 name = "recon"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "async-std-resolver",
  "futures",
  "itertools",

@@ -16,8 +16,9 @@ description = "Cargo subcommand to work with AWS Lambda"
 rust-version = "1.64.0"
 
 [workspace.dependencies]
-recon = {version = "0.3.0", path = "crates/recon"}
-tokio = { version = "1.0.2" }
+recon = { version = "0.3.0", path = "crates/recon" }
+tokio = { ersion = "1.0.2" }
+anyhow = { version = "1.0.66" }
 
 [profile.release]
 strip = "symbols"

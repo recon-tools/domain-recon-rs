@@ -1,9 +1,10 @@
+use anyhow::anyhow;
 use clap::Parser;
 use csv::Writer;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use recon::{run, DNSResolver, DomainInfo};
+use recon::{run, DNSResolver, DomainInfo, UnknownDNSResolver};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -40,10 +41,10 @@ struct ReconArgs {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), ()> {
+async fn main() -> Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
 
-    let dns_input: Result<Vec<DNSResolver>, _> = if !args.use_system_resolver {
+    let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {
         args.dns_resolver
             .iter()
             .map(|resolver| DNSResolver::from_str(resolver))
@@ -52,31 +53,21 @@ async fn main() -> Result<(), ()> {
         Ok(vec![])
     };
 
-    let dns_resolver = match dns_input {
-        Ok(r) => r,
-        Err(e) => {
-            panic!("Input error: {}", e)
-        }
-    };
+    let dns_resolver = dns_input.map_err(|e| anyhow!(e))?;
 
-    match run(
+    let result = run(
         args.domain,
         args.file,
         args.use_system_resolver,
         dns_resolver,
         args.plain,
     )
-    .await
-    {
-        Ok(domains) => {
-            if args.csv {
-                write_to_csv(&domains).unwrap();
-            }
-        }
-        Err(e) => {
-            panic!("Runtime Error: {}", e)
-        }
+    .await?;
+
+    if args.csv {
+        write_to_csv(&result).unwrap();
     }
+
     Ok(())
 }
 
