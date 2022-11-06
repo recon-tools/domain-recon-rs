@@ -9,6 +9,8 @@ Moreover, in a lot of cases it may encounter certificates issued for wildcard do
 For these domains, it can use a word list to extend these wildcards by filling on words from the list and generate
 potential subdomains.
 
+For more information, please read the blogpost: [https://ervinszilagyi.dev/articles/certificate-parsing-with-domain-recon](https://ervinszilagyi.dev/articles/certificate-parsing-with-domain-recon)
+
 ### Example of usage:
 
 ```bash
