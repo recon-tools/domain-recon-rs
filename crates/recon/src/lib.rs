@@ -55,6 +55,8 @@ static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "*");
 static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "*");
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 
+static BATCH_SIZE: usize = 200;
+
 pub async fn run(
     domain: String,
     file: String,
@@ -217,7 +219,7 @@ async fn get_resolvable_domains(
     let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
 
     // Build chunks of records in order to avoid having to many opened connections.
-    let chunks = domains.into_iter().chunks(1000);
+    let chunks = domains.into_iter().chunks(BATCH_SIZE);
     for c in &chunks {
         let futures = c
             .into_iter()
