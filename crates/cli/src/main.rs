@@ -40,9 +40,24 @@ struct ReconArgs {
     dns_resolver: Vec<String>,
 }
 
+static ASCII_ART: &str = r#"
+     _                   _
+    | |                 (_)
+  _ | | ___  ____   ____ _ ____      ____ ____ ____ ___  ____
+ / || |/ _ \|    \ / _  | |  _ \    / ___) _  ) ___) _ \|  _ \
+( (_| | |_| | | | ( ( | | | | | |  | |  ( (/ ( (__| |_| | | | |
+ \____|\___/|_|_|_|\_||_|_|_| |_|  |_|   \____)____)___/|_| |_|
+
+"#;
+
+
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
+
+    if !args.plain {
+        println!("{}", ASCII_ART);
+    }
 
     let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {
         args.dns_resolver
@@ -70,6 +85,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
 
 fn write_to_csv(domains: &Vec<DomainInfo>) -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = Writer::from_path("result.csv")?;

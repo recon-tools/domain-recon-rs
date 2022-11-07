@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::future;
 use std::path::Path;
 
@@ -6,6 +7,7 @@ use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
 };
+use console::{style, Emoji};
 use futures::future::join_all;
 use futures::FutureExt;
 use itertools::Itertools;
@@ -49,6 +51,10 @@ impl DomainInfo {
     }
 }
 
+static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "*");
+static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "*");
+static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
+
 pub async fn run(
     domain: String,
     file: String,
@@ -56,14 +62,24 @@ pub async fn run(
     dns_resolvers: Vec<DNSResolver>,
     plain: bool,
 ) -> Result<Vec<DomainInfo>, anyhow::Error> {
+    let steps = if file.is_empty() { 2 } else { 3 };
+
     if !plain {
-        println!("Fetching certificates...");
+        println!(
+            "{} {}Fetching certificates...",
+            style(format!("[1/{}]", steps)).bold().dim(),
+            LOOKING_GLASS
+        );
     }
 
     let certificates = fetch_certificates(&domain).await?;
 
     if !plain {
-        println!("Extracting domains....");
+        println!(
+            "\n{} {}Extracting valid domains...",
+            style(format!("[2/{}]", steps)).bold().dim(),
+            CLIP
+        );
     }
 
     let mut domains: HashSet<String> = HashSet::new();
@@ -89,7 +105,11 @@ pub async fn run(
     if !file.trim().is_empty() {
         let words_path = Path::new(&file);
         if !plain {
-            println!("\nExpanding wildcards...");
+            println!(
+                "\n{} {}Expanding wildcards...",
+                style(format!("[3/{}]", steps)).bold().dim(),
+                SPARKLE
+            );
         }
 
         let words = read_words(words_path).await?;
@@ -197,7 +217,7 @@ async fn get_resolvable_domains(
     let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
 
     // Build chunks of records in order to avoid having to many opened connections.
-    let chunks = domains.into_iter().chunks(200);
+    let chunks = domains.into_iter().chunks(1000);
     for c in &chunks {
         let futures = c
             .into_iter()
