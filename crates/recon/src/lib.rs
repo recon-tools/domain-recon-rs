@@ -1,8 +1,3 @@
-mod resolver;
-pub use self::resolver::DNSResolver;
-pub use self::resolver::UnknownDNSResolver;
-
-use itertools::Itertools;
 use std::collections::HashSet;
 use std::future;
 use std::path::Path;
@@ -13,9 +8,15 @@ use async_std_resolver::{
 };
 use futures::future::join_all;
 use futures::FutureExt;
+use itertools::Itertools;
 use serde::Deserialize;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
+
+pub use self::resolver::DNSResolver;
+pub use self::resolver::UnknownDNSResolver;
+
+mod resolver;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -90,7 +91,9 @@ pub async fn run(
         if !plain {
             println!("\nExpanding wildcards...");
         }
-        if let Ok(domains) = extend_wildcards(words_path, &wildcards, &fqdns).await {
+
+        let words = read_words(words_path).await?;
+        if let Ok(domains) = expand_wildcards(&wildcards, &fqdns, &words).await {
             resolvable.extend(get_resolvable_domains(&domains, &resolver, plain).await);
         }
     }
@@ -159,15 +162,22 @@ async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::E
     response?.json::<Vec<Certificate>>().await
 }
 
-async fn extend_wildcards(
-    words_path: &Path,
+async fn read_words(words_path: &Path) -> Result<HashSet<String>, io::Error> {
+    let mut lines = BufReader::new(File::open(words_path).await?).lines();
+    let mut words: HashSet<String> = HashSet::new();
+    while let Some(line) = lines.next_line().await? {
+        words.insert(line.trim().to_string());
+    }
+    Ok(words)
+}
+
+async fn expand_wildcards(
     wildcards: &HashSet<String>,
     fqdns: &HashSet<String>,
+    words: &HashSet<String>,
 ) -> Result<HashSet<String>, io::Error> {
     let mut potential_domains: HashSet<String> = HashSet::new();
-    let mut lines = BufReader::new(File::open(words_path).await?).lines();
-    while let Some(line) = lines.next_line().await? {
-        let word = line.trim();
+    for word in words {
         potential_domains.extend(
             wildcards
                 .iter()
@@ -229,6 +239,31 @@ fn pretty_print(lookup: &LookupIp, plain: bool) {
             lookup.query().name(),
             lookup.query().query_type(),
             records.join(", ")
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_expand_wildcards() {
+        let wildcards = HashSet::from([String::from("*.example.com"), String::from("*.here.com")]);
+        let fqdns = HashSet::from([String::from("example.com"), String::from("there.com")]);
+        let words = HashSet::from([String::from("a"), String::from("b"), String::from("c")]);
+        assert_eq!(
+            HashSet::from([
+                String::from("a.here.com"),
+                String::from("c.example.com"),
+                String::from("b.here.com"),
+                String::from("a.example.com"),
+                String::from("c.here.com"),
+                String::from("b.example.com")
+            ]),
+            expand_wildcards(&wildcards, &fqdns, &words)
+                .await
+                .expect("Error")
         );
     }
 }
