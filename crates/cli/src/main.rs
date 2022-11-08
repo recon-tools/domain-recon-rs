@@ -1,10 +1,15 @@
-use anyhow::anyhow;
-use clap::Parser;
-use csv::Writer;
 use std::fmt::Debug;
 use std::str::FromStr;
+use std::string::String;
 
-use recon::{run, DNSResolver, DomainInfo, UnknownDNSResolver};
+use anyhow::anyhow;
+use clap::Parser;
+
+use recon::{run, DNSResolver, UnknownDNSResolver};
+
+use crate::writer::{CsvWriter, StdWriter, Writer};
+
+mod writer;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -40,7 +45,7 @@ struct ReconArgs {
     dns_resolver: Vec<String>,
 }
 
-static ASCII_ART: &str = r#"
+static BANNER: &str = r#"
      _                   _
     | |                 (_)
   _ | | ___  ____   ____ _ ____      ____ ____ ____ ___  ____
@@ -50,13 +55,12 @@ static ASCII_ART: &str = r#"
 
 "#;
 
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
 
     if !args.plain {
-        println!("{}", ASCII_ART);
+        println!("{}", BANNER);
     }
 
     let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {
@@ -79,23 +83,18 @@ async fn main() -> Result<(), anyhow::Error> {
     )
     .await?;
 
+    let mut writers: Vec<Box<dyn Writer>> = vec![];
+    if args.plain {
+        writers.push(Box::new(StdWriter {}));
+    }
+
     if args.csv {
-        write_to_csv(&result).unwrap();
+        writers.push(Box::new(CsvWriter::new(String::from("result.csv"))));
     }
 
-    Ok(())
-}
-
-
-fn write_to_csv(domains: &Vec<DomainInfo>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::from_path("result.csv")?;
-    for domain in domains {
-        writer.write_record(&[
-            &domain.name,
-            &domain.domain_type,
-            &domain.ip_addresses.join(", "),
-        ])?;
+    for writer in writers {
+        writer.write(&result)?;
     }
-    writer.flush()?;
+
     Ok(())
 }

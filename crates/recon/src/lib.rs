@@ -62,11 +62,11 @@ pub async fn run(
     file: String,
     use_system_resolver: bool,
     dns_resolvers: Vec<DNSResolver>,
-    plain: bool,
+    silent: bool,
 ) -> Result<Vec<DomainInfo>, anyhow::Error> {
     let steps = if file.is_empty() { 2 } else { 3 };
 
-    if !plain {
+    if !silent {
         println!(
             "{} {}Fetching certificates...",
             style(format!("[1/{}]", steps)).bold().dim(),
@@ -76,7 +76,7 @@ pub async fn run(
 
     let certificates = fetch_certificates(&domain).await?;
 
-    if !plain {
+    if !silent {
         println!(
             "\n{} {}Extracting valid domains...",
             style(format!("[2/{}]", steps)).bold().dim(),
@@ -102,11 +102,11 @@ pub async fn run(
 
     let resolver = build_resolver(use_system_resolver, &dns_resolvers).await?;
 
-    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, plain).await;
+    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, silent).await;
 
     if !file.trim().is_empty() {
         let words_path = Path::new(&file);
-        if !plain {
+        if !silent {
             println!(
                 "\n{} {}Expanding wildcards...",
                 style(format!("[3/{}]", steps)).bold().dim(),
@@ -116,7 +116,7 @@ pub async fn run(
 
         let words = read_words(words_path).await?;
         if let Ok(domains) = expand_wildcards(&wildcards, &fqdns, &words).await {
-            resolvable.extend(get_resolvable_domains(&domains, &resolver, plain).await);
+            resolvable.extend(get_resolvable_domains(&domains, &resolver, silent).await);
         }
     }
 
@@ -214,7 +214,7 @@ async fn expand_wildcards(
 async fn get_resolvable_domains(
     domains: &HashSet<String>,
     resolver: &AsyncStdResolver,
-    plain: bool,
+    silent: bool,
 ) -> Vec<LookupIp> {
     let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
 
@@ -228,7 +228,7 @@ async fn get_resolvable_domains(
                     // Display results as soon as they appear
                     future::ready(match r {
                         Ok(ip) => {
-                            pretty_print(&ip, plain);
+                            pretty_print(&ip, silent);
                             Ok(ip)
                         }
                         Err(e) => {
@@ -248,14 +248,12 @@ async fn get_resolvable_domains(
         .collect::<Vec<LookupIp>>()
 }
 
-fn pretty_print(lookup: &LookupIp, plain: bool) {
+fn pretty_print(lookup: &LookupIp, silent: bool) {
     let records = lookup
         .iter()
         .map(|record| record.to_string())
         .collect::<Vec<String>>();
-    if plain {
-        println!("{}", lookup.query().name())
-    } else {
+    if !silent {
         println!(
             "{} {} {}",
             lookup.query().name(),
