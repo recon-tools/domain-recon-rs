@@ -1,3 +1,4 @@
+use addr::parse_domain_name;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future;
@@ -220,9 +221,10 @@ async fn get_resolvable_domains(
 
     // Build chunks of records in order to avoid having to many opened connections.
     let chunks = domains.into_iter().chunks(BATCH_SIZE);
-    for c in &chunks {
-        let futures = c
+    for chunk in &chunks {
+        let futures = chunk
             .into_iter()
+            .filter(|str| parse_domain_name(str).is_ok())
             .map(|domain| {
                 resolver.lookup_ip(domain).then(|r| {
                     // Display results as soon as they appear
