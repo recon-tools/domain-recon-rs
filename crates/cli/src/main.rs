@@ -4,6 +4,7 @@ use std::string::String;
 
 use anyhow::anyhow;
 use clap::Parser;
+use console::style;
 
 use recon::{run, DNSResolver, UnknownDNSResolver};
 
@@ -60,7 +61,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
 
     if !args.plain {
-        println!("{}", BANNER);
+        println!("{}", style(BANNER).cyan().bold());
     }
 
     let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {

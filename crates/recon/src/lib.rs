@@ -69,9 +69,10 @@ pub async fn run(
 
     if !silent {
         println!(
-            "{} {}Fetching certificates...",
+            "{} {}{}",
             style(format!("[1/{}]", steps)).bold().dim(),
-            LOOKING_GLASS
+            LOOKING_GLASS,
+            style("Fetching certificates...").bold()
         );
     }
 
@@ -79,9 +80,10 @@ pub async fn run(
 
     if !silent {
         println!(
-            "\n{} {}Extracting valid domains...",
+            "\n{} {}{}",
             style(format!("[2/{}]", steps)).bold().dim(),
-            CLIP
+            CLIP,
+            style("Extracting valid domains...").bold()
         );
     }
 
@@ -109,9 +111,10 @@ pub async fn run(
         let words_path = Path::new(&file);
         if !silent {
             println!(
-                "\n{} {}Expanding wildcards...",
+                "\n{} {}{}",
                 style(format!("[3/{}]", steps)).bold().dim(),
-                SPARKLE
+                SPARKLE,
+                style("Expanding wildcards...").bold()
             );
         }
 
@@ -258,9 +261,9 @@ fn pretty_print(lookup: &LookupIp, silent: bool) {
     if !silent {
         println!(
             "{} {} {}",
-            lookup.query().name(),
-            lookup.query().query_type(),
-            records.join(", ")
+            style(lookup.query().name().to_string()).green(),
+            style(lookup.query().query_type().to_string()).blue().bold(),
+            style(records.join(", ")).magenta().bright()
         );
     }
 }

@@ -17,8 +17,9 @@ rust-version = "1.64.0"
 
 [workspace.dependencies]
 recon = { version = "0.3.0", path = "crates/recon" }
-tokio = { ersion = "1.0.2" }
+tokio = { version = "1.0.2" }
 anyhow = { version = "1.0.66" }
+console = { version = "0.15.2" }
 
 [profile.release]
 strip = "symbols"
