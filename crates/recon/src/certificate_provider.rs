@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub struct UnknownCertificateProvider {
-    pub provider: String,
+#[allow(dead_code, unused_variables)]
+pub(crate) struct UnknownCertificateProvider {
+    pub(crate) provider: String,
 }
 
 impl UnknownCertificateProvider {
@@ -18,7 +19,7 @@ impl std::fmt::Display for UnknownCertificateProvider {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum CertificateProvider {
+pub(crate) enum CertificateProvider {
     CertSh,
     Censys,
 }

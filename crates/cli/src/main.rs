@@ -1,14 +1,10 @@
 use std::fmt::Debug;
-use std::str::FromStr;
 use std::string::String;
 
-use anyhow::anyhow;
 use clap::Parser;
 use console::style;
 
-use recon::{
-    run, CertificateProvider, DNSResolver, UnknownCertificateProvider, UnknownDNSResolver,
-};
+use recon::{run, InputArgs};
 
 use crate::writer::{CsvWriter, StdWriter, Writer};
 
@@ -80,35 +76,17 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("{}", style(BANNER).cyan().bold());
     }
 
-    let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {
-        args.dns_resolver
-            .iter()
-            .map(|resolver| DNSResolver::from_str(resolver))
-            .collect()
-    } else {
-        Ok(vec![])
-    };
-
-    let dns_resolver = dns_input.map_err(|e| anyhow!(e))?;
-
-    let certificate_provider_input: Result<Vec<CertificateProvider>, UnknownCertificateProvider> =
-        args.provider
-            .iter()
-            .map(|provider| CertificateProvider::from_str(provider))
-            .collect();
-
-    let certificate_providers = certificate_provider_input.map_err(|e| anyhow!(e))?;
-
-    let result = run(
+    let input_args = InputArgs::new(
         args.domain,
-        certificate_providers,
+        &args.provider,
         args.file,
         args.use_system_resolver,
-        dns_resolver,
+        &args.dns_resolver,
         args.plain,
         args.config,
-    )
-    .await?;
+    )?;
+
+    let result = run(input_args).await?;
 
     let mut writers: Vec<Box<dyn Writer>> = vec![];
     if args.plain {

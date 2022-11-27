@@ -2,11 +2,13 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future;
 use std::future::Future;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::pin::Pin;
+use std::str::FromStr;
 
 use crate::censys_fetcher::CensysConfig;
 use addr::parse_domain_name;
+use anyhow::anyhow;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -17,19 +19,66 @@ use futures::FutureExt;
 use itertools::Itertools;
 use reqwest::Error;
 use tokio::fs::{read_to_string, File};
-use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::{self, AsyncBufReadExt, BufReader};
 
-pub use self::certificate_provider::CertificateProvider;
-pub use self::certificate_provider::UnknownCertificateProvider;
-pub use self::resolver::DNSResolver;
-pub use self::resolver::UnknownDNSResolver;
-
+use crate::certificate_provider::{CertificateProvider, UnknownCertificateProvider};
+use crate::resolver::{DNSResolver, UnknownDNSResolver};
 use serde::{Deserialize, Serialize};
 
 mod censys_fetcher;
 mod certificate_provider;
 mod crtsh_fetcher;
 mod resolver;
+
+#[derive(Debug)]
+pub struct InputArgs {
+    domain: String,
+    certificate_providers: Vec<CertificateProvider>,
+    file: String,
+    use_system_resolver: bool,
+    dns_resolvers: Vec<DNSResolver>,
+    silent: bool,
+    config: Option<String>,
+}
+
+impl InputArgs {
+    pub fn new(
+        domain: String,
+        certificate_providers_str: &Vec<String>,
+        file: String,
+        use_system_resolver: bool,
+        dns_resolvers_str: &Vec<String>,
+        silent: bool,
+        config: Option<String>,
+    ) -> anyhow::Result<InputArgs> {
+        let certificate_providers_input: Result<
+            Vec<CertificateProvider>,
+            UnknownCertificateProvider,
+        > = certificate_providers_str
+            .iter()
+            .map(|provider| CertificateProvider::from_str(provider))
+            .collect();
+
+        let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !use_system_resolver {
+            dns_resolvers_str
+                .iter()
+                .map(|resolver| DNSResolver::from_str(resolver))
+                .collect()
+        } else {
+            Ok(vec![])
+        };
+
+        Ok(InputArgs {
+            domain,
+            certificate_providers: certificate_providers_input.map_err(|e| anyhow!(e))?,
+            file,
+            use_system_resolver,
+            dns_resolvers: dns_input.map_err(|e| anyhow!(e))?,
+            silent,
+            config,
+        })
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DomainReconConfig {
@@ -59,18 +108,10 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 
 static BATCH_SIZE: usize = 200;
 
-pub async fn run(
-    domain: String,
-    certificate_providers: Vec<CertificateProvider>,
-    file: String,
-    use_system_resolver: bool,
-    dns_resolvers: Vec<DNSResolver>,
-    silent: bool,
-    config: Option<String>,
-) -> Result<Vec<DomainInfo>, anyhow::Error> {
-    let steps = if file.is_empty() { 2 } else { 3 };
+pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
+    let steps = if input_args.file.is_empty() { 2 } else { 3 };
 
-    if !silent {
+    if !input_args.silent {
         println!(
             "{} {}{}",
             style(format!("[1/{}]", steps)).bold().dim(),
@@ -79,7 +120,7 @@ pub async fn run(
         );
     }
 
-    if !silent {
+    if !input_args.silent {
         println!(
             "\n{} {}{}",
             style(format!("[2/{}]", steps)).bold().dim(),
@@ -93,29 +134,32 @@ pub async fn run(
         None => Path::new(".").to_path_buf(),
     };
 
-    let config_path = config.map_or(default_home_path, |path_str| {
+    let config_path = input_args.config.map_or(default_home_path, |path_str| {
         Path::new(&path_str).to_path_buf()
     });
 
     let config = match read_config(config_path).await {
         Ok(c) => Some(c),
         Err(e) => {
-            if certificate_providers.contains(&CertificateProvider::Censys) {
+            if input_args
+                .certificate_providers
+                .contains(&CertificateProvider::Censys)
+            {
                 println!("Warning: Config file could not be read: {:}", e.to_string());
             }
             None
         }
     };
 
-    let (wildcards, fqdns) = fetch_certificates(&certificate_providers, domain, config).await?;
+    let (wildcards, fqdns) =
+        fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
+    let resolver =
+        build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
+    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, input_args.silent).await;
 
-    let resolver = build_resolver(use_system_resolver, &dns_resolvers).await?;
-
-    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, silent).await;
-
-    if !file.trim().is_empty() {
-        let words_path = Path::new(&file);
-        if !silent {
+    if !input_args.file.trim().is_empty() {
+        let words_path = Path::new(&input_args.file);
+        if !input_args.silent {
             println!(
                 "\n{} {}{}",
                 style(format!("[3/{}]", steps)).bold().dim(),
@@ -126,7 +170,7 @@ pub async fn run(
 
         let words = read_words(words_path).await?;
         if let Ok(domains) = expand_wildcards(&wildcards, &fqdns, &words).await {
-            resolvable.extend(get_resolvable_domains(&domains, &resolver, silent).await);
+            resolvable.extend(get_resolvable_domains(&domains, &resolver, input_args.silent).await);
         }
     }
 
@@ -239,7 +283,7 @@ async fn build_resolver(
     resolver
 }
 
-async fn read_words(words_path: &Path) -> Result<HashSet<String>, io::Error> {
+async fn read_words<P: AsRef<Path>>(words_path: P) -> Result<HashSet<String>, io::Error> {
     let mut lines = BufReader::new(File::open(words_path).await?).lines();
     let mut words: HashSet<String> = HashSet::new();
     while let Some(line) = lines.next_line().await? {

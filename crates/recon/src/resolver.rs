@@ -1,8 +1,9 @@
 use std::str::FromStr;
 
 #[derive(Debug)]
-pub struct UnknownDNSResolver {
-    pub resolver_name: String,
+#[allow(dead_code, unused_variables)]
+pub(crate) struct UnknownDNSResolver {
+    pub(crate) resolver_name: String,
 }
 
 impl UnknownDNSResolver {
@@ -18,7 +19,7 @@ impl std::fmt::Display for UnknownDNSResolver {
 }
 
 #[derive(Debug)]
-pub enum DNSResolver {
+pub(crate) enum DNSResolver {
     Google,
     CloudFlare,
     Quad9,
