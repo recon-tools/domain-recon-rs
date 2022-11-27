@@ -16,7 +16,7 @@ use futures::future::join_all;
 use futures::FutureExt;
 use itertools::Itertools;
 use reqwest::Error;
-use tokio::fs::{File, read_to_string};
+use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, BufReader};
 
 pub use self::certificate_provider::CertificateProvider;
