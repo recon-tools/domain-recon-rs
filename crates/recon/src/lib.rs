@@ -1,9 +1,11 @@
-use addr::parse_domain_name;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future;
+use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
 
+use addr::parse_domain_name;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -12,28 +14,19 @@ use console::{style, Emoji};
 use futures::future::join_all;
 use futures::FutureExt;
 use itertools::Itertools;
-use serde::Deserialize;
+use reqwest::Error;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
+pub use self::certificate_provider::CertificateProvider;
+pub use self::certificate_provider::UnknownCertificateProvider;
 pub use self::resolver::DNSResolver;
 pub use self::resolver::UnknownDNSResolver;
 
+mod censys_fetcher;
+mod certificate_provider;
+mod crtsh_fetcher;
 mod resolver;
-
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct Certificate {
-    issuer_ca_id: i64,
-    issuer_name: String,
-    common_name: String,
-    name_value: String,
-    id: i128,
-    entry_timestamp: String,
-    not_before: String,
-    not_after: String,
-    serial_number: String,
-}
 
 #[derive(Debug)]
 pub struct DomainInfo {
@@ -60,6 +53,7 @@ static BATCH_SIZE: usize = 200;
 
 pub async fn run(
     domain: String,
+    certificate_providers: Vec<CertificateProvider>,
     file: String,
     use_system_resolver: bool,
     dns_resolvers: Vec<DNSResolver>,
@@ -76,8 +70,6 @@ pub async fn run(
         );
     }
 
-    let certificates = fetch_certificates(&domain).await?;
-
     if !silent {
         println!(
             "\n{} {}{}",
@@ -87,21 +79,7 @@ pub async fn run(
         );
     }
 
-    let mut domains: HashSet<String> = HashSet::new();
-    for certificate in certificates {
-        domains.extend(
-            certificate
-                .name_value
-                .split('\n')
-                .map(|s| s.to_string())
-                .collect::<HashSet<String>>(),
-        );
-        domains.insert(certificate.common_name);
-    }
-
-    let (wildcards, fqdns) = domains
-        .into_iter()
-        .partition(|domain| domain.starts_with('*'));
+    let (wildcards, fqdns) = fetch_certificates(&certificate_providers, domain).await?;
 
     let resolver = build_resolver(use_system_resolver, &dns_resolvers).await?;
 
@@ -142,6 +120,45 @@ pub async fn run(
     Ok(result)
 }
 
+async fn fetch_certificates(
+    certificate_providers: &Vec<CertificateProvider>,
+    domain: String,
+) -> Result<(HashSet<String>, HashSet<String>), Error> {
+    type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
+
+    let mut wildcards = HashSet::new();
+    let mut fqdns = HashSet::new();
+
+    let mut futures: Vec<PinFutureObj<Result<(Vec<String>, Vec<String>), Error>>> = Vec::new();
+
+    if certificate_providers.contains(&CertificateProvider::CertSh) {
+        futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
+    }
+
+    if certificate_providers.contains(&CertificateProvider::Censys) {
+        futures.push(Box::pin(censys_fetcher::fetch(
+            domain.clone(),
+            String::from("84f2fe92-9c4e-460f-9254-76e25b0617e9"),
+            String::from("iJTp8Zah46INV372nX5FjK72qjZonpgH"),
+        )));
+    }
+
+    let results = join_all(futures).await;
+
+    for result in results {
+        match result {
+            Ok((w, f)) => {
+                wildcards.extend(w);
+                fqdns.extend(f);
+            }
+            Err(e) => {
+                println!("Could not fetch for {}", e);
+            }
+        };
+    }
+    Ok((wildcards, fqdns))
+}
+
 async fn build_resolver(
     use_system_resolver: bool,
     dns_resolvers: &Vec<DNSResolver>,
@@ -176,16 +193,6 @@ async fn build_resolver(
     let resolver_cfg = config::ResolverOpts::default();
     let resolver = resolver(dns_cfg, resolver_cfg).await;
     resolver
-}
-
-async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
-    let client = reqwest::Client::new();
-    let response = client
-        .get("https://crt.sh")
-        .query(&[("q", domain), ("output", "json"), ("excluded", "expired")])
-        .send()
-        .await;
-    response?.json::<Vec<Certificate>>().await
 }
 
 async fn read_words(words_path: &Path) -> Result<HashSet<String>, io::Error> {

@@ -6,7 +6,9 @@ use anyhow::anyhow;
 use clap::Parser;
 use console::style;
 
-use recon::{run, DNSResolver, UnknownDNSResolver};
+use recon::{
+    run, CertificateProvider, DNSResolver, UnknownCertificateProvider, UnknownDNSResolver,
+};
 
 use crate::writer::{CsvWriter, StdWriter, Writer};
 
@@ -44,6 +46,16 @@ struct ReconArgs {
         default_value = "google"
     )]
     dns_resolver: Vec<String>,
+
+    /// Certificate provider. Allowed values are: certsh, censys. Default is certsh
+    /// Can contain multiple values delimited by comma, ex --provider=certsh,censys
+    #[clap(
+        long,
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        default_value = "certsh"
+    )]
+    provider: Vec<String>,
 }
 
 static BANNER: &str = r#"
@@ -75,8 +87,17 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let dns_resolver = dns_input.map_err(|e| anyhow!(e))?;
 
+    let certificate_provider_input: Result<Vec<CertificateProvider>, UnknownCertificateProvider> =
+        args.provider
+            .iter()
+            .map(|provider| CertificateProvider::from_str(provider))
+            .collect();
+
+    let certificate_providers = certificate_provider_input.map_err(|e| anyhow!(e))?;
+
     let result = run(
         args.domain,
+        certificate_providers,
         args.file,
         args.use_system_resolver,
         dns_resolver,
