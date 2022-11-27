@@ -1,12 +1,10 @@
 use std::fmt::Debug;
-use std::str::FromStr;
 use std::string::String;
 
-use anyhow::anyhow;
 use clap::Parser;
 use console::style;
 
-use recon::{run, DNSResolver, UnknownDNSResolver};
+use recon::{run, InputArgs};
 
 use crate::writer::{CsvWriter, StdWriter, Writer};
 
@@ -44,6 +42,20 @@ struct ReconArgs {
         default_value = "google"
     )]
     dns_resolver: Vec<String>,
+
+    /// Certificate provider. Allowed values are: certsh, censys. Default is certsh
+    /// Can contain multiple values delimited by comma, ex --provider=certsh,censys
+    #[clap(
+        long,
+        use_value_delimiter = true,
+        value_delimiter = ',',
+        default_value = "certsh"
+    )]
+    provider: Vec<String>,
+
+    /// Path to config file
+    #[clap(short, long, value_parser)]
+    config: Option<String>,
 }
 
 static BANNER: &str = r#"
@@ -64,25 +76,17 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("{}", style(BANNER).cyan().bold());
     }
 
-    let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !args.use_system_resolver {
-        args.dns_resolver
-            .iter()
-            .map(|resolver| DNSResolver::from_str(resolver))
-            .collect()
-    } else {
-        Ok(vec![])
-    };
-
-    let dns_resolver = dns_input.map_err(|e| anyhow!(e))?;
-
-    let result = run(
+    let input_args = InputArgs::new(
         args.domain,
+        &args.provider,
         args.file,
         args.use_system_resolver,
-        dns_resolver,
+        &args.dns_resolver,
         args.plain,
-    )
-    .await?;
+        args.config,
+    )?;
+
+    let result = run(input_args).await?;
 
     let mut writers: Vec<Box<dyn Writer>> = vec![];
     if args.plain {

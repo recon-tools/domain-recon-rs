@@ -5,18 +5,18 @@ members = [
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.7.0"
 authors = ["Ervin Szilagyi"]
 edition = "2021"
 license = "MIT"
 homepage = "https://github.com/domain-recon/domain-recon-rs"
 repository = "https://github.com/domain-recon/domain-recon-rs"
 keywords = ["domain", "recon"]
-description = "Cargo subcommand to work with AWS Lambda"
+description = "Extract domains and subdomains from certificates."
 rust-version = "1.64.0"
 
 [workspace.dependencies]
-recon = { version = "0.3.0", path = "crates/recon" }
+recon = { version = "0.7.0", path = "crates/recon" }
 tokio = { version = "1.0.2" }
 anyhow = { version = "1.0.66" }
 console = { version = "0.15.2" }

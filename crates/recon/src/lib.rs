@@ -1,9 +1,14 @@
-use addr::parse_domain_name;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future;
+use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
+use std::str::FromStr;
 
+use crate::censys_fetcher::CensysConfig;
+use addr::parse_domain_name;
+use anyhow::anyhow;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -12,27 +17,72 @@ use console::{style, Emoji};
 use futures::future::join_all;
 use futures::FutureExt;
 use itertools::Itertools;
-use serde::Deserialize;
-use tokio::fs::File;
+use reqwest::Error;
+use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
-pub use self::resolver::DNSResolver;
-pub use self::resolver::UnknownDNSResolver;
+use crate::certificate_provider::{CertificateProvider, UnknownCertificateProvider};
+use crate::resolver::{DNSResolver, UnknownDNSResolver};
+use serde::{Deserialize, Serialize};
 
+mod censys_fetcher;
+mod certificate_provider;
+mod crtsh_fetcher;
 mod resolver;
 
-#[allow(dead_code)]
-#[derive(Debug, Deserialize)]
-struct Certificate {
-    issuer_ca_id: i64,
-    issuer_name: String,
-    common_name: String,
-    name_value: String,
-    id: i128,
-    entry_timestamp: String,
-    not_before: String,
-    not_after: String,
-    serial_number: String,
+#[derive(Debug)]
+pub struct InputArgs {
+    domain: String,
+    certificate_providers: Vec<CertificateProvider>,
+    file: String,
+    use_system_resolver: bool,
+    dns_resolvers: Vec<DNSResolver>,
+    silent: bool,
+    config: Option<String>,
+}
+
+impl InputArgs {
+    pub fn new(
+        domain: String,
+        certificate_providers_str: &Vec<String>,
+        file: String,
+        use_system_resolver: bool,
+        dns_resolvers_str: &Vec<String>,
+        silent: bool,
+        config: Option<String>,
+    ) -> anyhow::Result<InputArgs> {
+        let certificate_providers_input: Result<
+            Vec<CertificateProvider>,
+            UnknownCertificateProvider,
+        > = certificate_providers_str
+            .iter()
+            .map(|provider| CertificateProvider::from_str(provider))
+            .collect();
+
+        let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !use_system_resolver {
+            dns_resolvers_str
+                .iter()
+                .map(|resolver| DNSResolver::from_str(resolver))
+                .collect()
+        } else {
+            Ok(vec![])
+        };
+
+        Ok(InputArgs {
+            domain,
+            certificate_providers: certificate_providers_input.map_err(|e| anyhow!(e))?,
+            file,
+            use_system_resolver,
+            dns_resolvers: dns_input.map_err(|e| anyhow!(e))?,
+            silent,
+            config,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DomainReconConfig {
+    censys: Option<Vec<CensysConfig>>,
 }
 
 #[derive(Debug)]
@@ -58,16 +108,10 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 
 static BATCH_SIZE: usize = 200;
 
-pub async fn run(
-    domain: String,
-    file: String,
-    use_system_resolver: bool,
-    dns_resolvers: Vec<DNSResolver>,
-    silent: bool,
-) -> Result<Vec<DomainInfo>, anyhow::Error> {
-    let steps = if file.is_empty() { 2 } else { 3 };
+pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
+    let steps = if input_args.file.is_empty() { 2 } else { 3 };
 
-    if !silent {
+    if !input_args.silent {
         println!(
             "{} {}{}",
             style(format!("[1/{}]", steps)).bold().dim(),
@@ -76,9 +120,7 @@ pub async fn run(
         );
     }
 
-    let certificates = fetch_certificates(&domain).await?;
-
-    if !silent {
+    if !input_args.silent {
         println!(
             "\n{} {}{}",
             style(format!("[2/{}]", steps)).bold().dim(),
@@ -87,29 +129,37 @@ pub async fn run(
         );
     }
 
-    let mut domains: HashSet<String> = HashSet::new();
-    for certificate in certificates {
-        domains.extend(
-            certificate
-                .name_value
-                .split('\n')
-                .map(|s| s.to_string())
-                .collect::<HashSet<String>>(),
-        );
-        domains.insert(certificate.common_name);
-    }
+    let default_home_path = match home::home_dir() {
+        Some(path) => path.join("domain-recon").join("config.json"),
+        None => Path::new(".").to_path_buf(),
+    };
 
-    let (wildcards, fqdns) = domains
-        .into_iter()
-        .partition(|domain| domain.starts_with('*'));
+    let config_path = input_args.config.map_or(default_home_path, |path_str| {
+        Path::new(&path_str).to_path_buf()
+    });
 
-    let resolver = build_resolver(use_system_resolver, &dns_resolvers).await?;
+    let config = match read_config(config_path).await {
+        Ok(c) => Some(c),
+        Err(e) => {
+            if input_args
+                .certificate_providers
+                .contains(&CertificateProvider::Censys)
+            {
+                println!("Warning: Config file could not be read: {:}", e.to_string());
+            }
+            None
+        }
+    };
 
-    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, silent).await;
+    let (wildcards, fqdns) =
+        fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
+    let resolver =
+        build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
+    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, input_args.silent).await;
 
-    if !file.trim().is_empty() {
-        let words_path = Path::new(&file);
-        if !silent {
+    if !input_args.file.trim().is_empty() {
+        let words_path = Path::new(&input_args.file);
+        if !input_args.silent {
             println!(
                 "\n{} {}{}",
                 style(format!("[3/{}]", steps)).bold().dim(),
@@ -120,7 +170,7 @@ pub async fn run(
 
         let words = read_words(words_path).await?;
         if let Ok(domains) = expand_wildcards(&wildcards, &fqdns, &words).await {
-            resolvable.extend(get_resolvable_domains(&domains, &resolver, silent).await);
+            resolvable.extend(get_resolvable_domains(&domains, &resolver, input_args.silent).await);
         }
     }
 
@@ -140,6 +190,61 @@ pub async fn run(
         .collect();
 
     Ok(result)
+}
+
+async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::Error> {
+    let contents = read_to_string(path).await?;
+    let config = serde_json::from_str::<DomainReconConfig>(&*contents)?;
+    Ok(config)
+}
+
+async fn fetch_certificates(
+    certificate_providers: &Vec<CertificateProvider>,
+    domain: String,
+    config: Option<DomainReconConfig>,
+) -> Result<(HashSet<String>, HashSet<String>), Error> {
+    type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
+
+    let mut wildcards = HashSet::new();
+    let mut fqdns = HashSet::new();
+
+    let mut futures: Vec<PinFutureObj<Result<(Vec<String>, Vec<String>), Error>>> = Vec::new();
+
+    if certificate_providers.contains(&CertificateProvider::CertSh) {
+        futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
+    }
+
+    match config {
+        None => {}
+        Some(config) => {
+            if certificate_providers.contains(&CertificateProvider::Censys) {
+                match config.censys {
+                    None => {
+                        println!("Warning! No censys credentials found!")
+                    }
+                    Some(censys) => {
+                        futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
+                    }
+                }
+            }
+
+            let results = join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok((w, f)) => {
+                        wildcards.extend(w);
+                        fqdns.extend(f);
+                    }
+                    Err(e) => {
+                        println!("Could not fetch for {}", e);
+                    }
+                };
+            }
+        }
+    }
+
+    Ok((wildcards, fqdns))
 }
 
 async fn build_resolver(
@@ -178,17 +283,7 @@ async fn build_resolver(
     resolver
 }
 
-async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
-    let client = reqwest::Client::new();
-    let response = client
-        .get("https://crt.sh")
-        .query(&[("q", domain), ("output", "json"), ("excluded", "expired")])
-        .send()
-        .await;
-    response?.json::<Vec<Certificate>>().await
-}
-
-async fn read_words(words_path: &Path) -> Result<HashSet<String>, io::Error> {
+async fn read_words<P: AsRef<Path>>(words_path: P) -> Result<HashSet<String>, io::Error> {
     let mut lines = BufReader::new(File::open(words_path).await?).lines();
     let mut words: HashSet<String> = HashSet::new();
     while let Some(line) = lines.next_line().await? {

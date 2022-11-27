@@ -381,7 +381,7 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
 name = "domain-recon"
-version = "0.3.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -634,6 +634,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62b467343b94ba476dcb2500d242dadbb39557df889310ac77c5d99100aaac33"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "home"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "747309b4b440c06d57b0b25f2aee03ee9b5e5397d288c60e21fc709bb98a7408"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
@@ -1161,16 +1170,18 @@ dependencies = [
 
 [[package]]
 name = "recon"
-version = "0.3.0"
+version = "0.7.0"
 dependencies = [
  "addr",
  "anyhow",
  "async-std-resolver",
  "console",
  "futures",
+ "home",
  "itertools",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
 ]
 
@@ -1312,9 +1323,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.87"
+version = "1.0.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ce777b7b150d76b9cf60d28b55f5847135a003f7d7350c6be7a773508ce7d45"
+checksum = "020ff22c755c2ed3f8cf162dbb41a7268d934702f3ed3631656ea597e08fc3db"
 dependencies = [
  "itoa 1.0.4",
  "ryu",
