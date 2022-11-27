@@ -2,6 +2,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt::Debug;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct CensysConfig {
+    #[serde(rename = "app-id")]
+    app_id: String,
+    secret: String,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Serialize)]
 struct Request {
@@ -40,10 +47,11 @@ struct CensysResponse {
 
 pub(crate) async fn fetch(
     domain: String,
-    api_id: String,
-    secret: String,
+    config: Vec<CensysConfig>,
 ) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
-    let responses = fetch_certificates(&domain, api_id, secret).await?;
+    let CensysConfig { app_id, secret } = &config[0];
+
+    let responses = fetch_certificates(&domain, app_id, secret).await?;
 
     let all_domains = responses
         .into_iter()
@@ -72,8 +80,8 @@ pub(crate) async fn fetch(
 
 async fn fetch_certificates(
     domain: &str,
-    api_id: String,
-    secret: String,
+    api_id: &String,
+    secret: &String,
 ) -> Result<Vec<CensysResponse>, reqwest::Error> {
     let client = reqwest::Client::new();
 
@@ -87,13 +95,13 @@ async fn fetch_certificates(
         ],
     };
 
-    let response = send_request(&client, &request, &api_id, &secret).await?;
+    let response = send_request(&client, &request, api_id, secret).await?;
     let pages = response.metadata.pages;
 
     let mut responses = vec![response];
     for i in 2..pages {
         request.page = i;
-        responses.push(send_request(&client, &request, &api_id, &secret).await?);
+        responses.push(send_request(&client, &request, api_id, secret).await?);
     }
 
     Ok(responses)

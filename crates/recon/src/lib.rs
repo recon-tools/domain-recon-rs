@@ -2,9 +2,10 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::future;
 use std::future::Future;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 
+use crate::censys_fetcher::CensysConfig;
 use addr::parse_domain_name;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
@@ -15,18 +16,25 @@ use futures::future::join_all;
 use futures::FutureExt;
 use itertools::Itertools;
 use reqwest::Error;
-use tokio::fs::File;
-use tokio::io::{self, AsyncBufReadExt, BufReader};
+use tokio::fs::{File, read_to_string};
+use tokio::io::{self, AsyncBufReadExt, AsyncReadExt, BufReader};
 
 pub use self::certificate_provider::CertificateProvider;
 pub use self::certificate_provider::UnknownCertificateProvider;
 pub use self::resolver::DNSResolver;
 pub use self::resolver::UnknownDNSResolver;
 
+use serde::{Deserialize, Serialize};
+
 mod censys_fetcher;
 mod certificate_provider;
 mod crtsh_fetcher;
 mod resolver;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct DomainReconConfig {
+    censys: Option<Vec<CensysConfig>>,
+}
 
 #[derive(Debug)]
 pub struct DomainInfo {
@@ -58,6 +66,7 @@ pub async fn run(
     use_system_resolver: bool,
     dns_resolvers: Vec<DNSResolver>,
     silent: bool,
+    config: Option<String>,
 ) -> Result<Vec<DomainInfo>, anyhow::Error> {
     let steps = if file.is_empty() { 2 } else { 3 };
 
@@ -79,7 +88,26 @@ pub async fn run(
         );
     }
 
-    let (wildcards, fqdns) = fetch_certificates(&certificate_providers, domain).await?;
+    let default_home_path = match home::home_dir() {
+        Some(path) => path.join("domain-recon").join("config.json"),
+        None => Path::new(".").to_path_buf(),
+    };
+
+    let config_path = config.map_or(default_home_path, |path_str| {
+        Path::new(&path_str).to_path_buf()
+    });
+
+    let config = match read_config(config_path).await {
+        Ok(c) => Some(c),
+        Err(e) => {
+            if certificate_providers.contains(&CertificateProvider::Censys) {
+                println!("Warning: Config file could not be read: {:}", e.to_string());
+            }
+            None
+        }
+    };
+
+    let (wildcards, fqdns) = fetch_certificates(&certificate_providers, domain, config).await?;
 
     let resolver = build_resolver(use_system_resolver, &dns_resolvers).await?;
 
@@ -120,9 +148,16 @@ pub async fn run(
     Ok(result)
 }
 
+async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::Error> {
+    let contents = read_to_string(path).await?;
+    let config = serde_json::from_str::<DomainReconConfig>(&*contents)?;
+    Ok(config)
+}
+
 async fn fetch_certificates(
     certificate_providers: &Vec<CertificateProvider>,
     domain: String,
+    config: Option<DomainReconConfig>,
 ) -> Result<(HashSet<String>, HashSet<String>), Error> {
     type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
 
@@ -135,27 +170,36 @@ async fn fetch_certificates(
         futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
     }
 
-    if certificate_providers.contains(&CertificateProvider::Censys) {
-        futures.push(Box::pin(censys_fetcher::fetch(
-            domain.clone(),
-            String::from("84f2fe92-9c4e-460f-9254-76e25b0617e9"),
-            String::from("iJTp8Zah46INV372nX5FjK72qjZonpgH"),
-        )));
+    match config {
+        None => {}
+        Some(config) => {
+            if certificate_providers.contains(&CertificateProvider::Censys) {
+                match config.censys {
+                    None => {
+                        println!("Warning! No censys credentials found!")
+                    }
+                    Some(censys) => {
+                        futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
+                    }
+                }
+            }
+
+            let results = join_all(futures).await;
+
+            for result in results {
+                match result {
+                    Ok((w, f)) => {
+                        wildcards.extend(w);
+                        fqdns.extend(f);
+                    }
+                    Err(e) => {
+                        println!("Could not fetch for {}", e);
+                    }
+                };
+            }
+        }
     }
 
-    let results = join_all(futures).await;
-
-    for result in results {
-        match result {
-            Ok((w, f)) => {
-                wildcards.extend(w);
-                fqdns.extend(f);
-            }
-            Err(e) => {
-                println!("Could not fetch for {}", e);
-            }
-        };
-    }
     Ok((wildcards, fqdns))
 }
 

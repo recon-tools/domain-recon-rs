@@ -56,6 +56,10 @@ struct ReconArgs {
         default_value = "certsh"
     )]
     provider: Vec<String>,
+
+    /// Path to config file
+    #[clap(short, long, value_parser)]
+    config: Option<String>,
 }
 
 static BANNER: &str = r#"
@@ -102,6 +106,7 @@ async fn main() -> Result<(), anyhow::Error> {
         args.use_system_resolver,
         dns_resolver,
         args.plain,
+        args.config,
     )
     .await?;
 

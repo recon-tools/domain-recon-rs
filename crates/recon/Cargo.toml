@@ -22,6 +22,6 @@ async-std-resolver = "0.22.0"
 itertools = "0.10.5"
 tokio = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
-#indicatif = "0.17.1"
 console = { workspace = true }
 addr = "0.15.6"
+home = "0.5.4"

@@ -11,6 +11,12 @@ impl UnknownCertificateProvider {
     }
 }
 
+impl std::fmt::Display for UnknownCertificateProvider {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(fmt, "Unknown Certificate provider!")
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum CertificateProvider {
     CertSh,
