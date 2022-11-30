@@ -17,24 +17,27 @@ struct ReconArgs {
     #[clap(short, long, value_parser)]
     domain: String,
 
-    /// Words file for extending wildcard domains
-    #[clap(short, long, value_parser, default_value = "")]
-    file: String,
+    /// Optional path to a words file used for expand wildcard domains. If there is no path
+    /// provided, there will be no attempt to expand wildcard domains.
+    #[clap(short, long, value_parser)]
+    file: Option<String>,
 
-    /// Display results in plain form
-    #[clap(short, long, action)]
+    /// Display results in plain form. Recommended, if the output is going to be provided as an
+    /// input for another application.
+    #[clap(short, long, action, default_value = "false")]
     plain: bool,
 
-    /// Save output to csv
-    #[clap(long, action)]
+    /// Save output to csv.
+    #[clap(long, action, default_value = "false")]
     csv: bool,
 
-    /// Use default system resolver
+    /// Use default system DNS resolver.
     #[clap(long, action, default_value = "false")]
     use_system_resolver: bool,
 
-    /// Specify DNS resolver. Allowed values are: google, cloudflare, quad9. Default is google
-    /// Can contain multiple values delimited by comma, ex --dns-resolver="google,cloudflare,quad9"
+    /// Specify a remote DNS resolver. Allowed values are: google, cloudflare, quad9. Default is
+    /// google .Can contain multiple values delimited by comma,
+    /// ex --dns-resolver="google,cloudflare,quad9"
     #[clap(
         long,
         use_value_delimiter = true,
@@ -43,7 +46,7 @@ struct ReconArgs {
     )]
     dns_resolver: Vec<String>,
 
-    /// Certificate provider. Allowed values are: certsh, censys. Default is certsh
+    /// Certificate provider. Allowed values are: certsh, censys. Default is certsh.
     /// Can contain multiple values delimited by comma, ex --provider=certsh,censys
     #[clap(
         long,

@@ -39,6 +39,7 @@ config.json
 ### All the Arguments
 
 ```bash
+$ domain-recon -h
 Extract domains and subdomains from certificates.
 
 Usage: domain-recon.exe [OPTIONS] --domain <DOMAIN>
@@ -47,17 +48,17 @@ Options:
   -d, --domain <DOMAIN>
           Domain name to be scanned
   -f, --file <FILE>
-          Words file for extending wildcard domains [default: ]
+          Optional path to a words file used for expand wildcard domains. If there is no path provided, there will be no attempt to expand wildcard domains
   -p, --plain
-          Display results in plain form
+          Display results in plain form. Recommended, if the output is going to be provided as an input for another application
       --csv
           Save output to csv
       --use-system-resolver
-          Use default system resolver
+          Use default system DNS resolver
       --dns-resolver <DNS_RESOLVER>
-          Specify DNS resolver. Allowed values are: google, cloudflare, quad9. Default is google Can contain multiple values delimited by comma, ex --dns-resolver="google,cloudflare,quad9" [default: google]
+          Specify a remote DNS resolver. Allowed values are: google, cloudflare, quad9. Default is google .Can contain multiple values delimited by comma, ex --dns-resolver="google,cloudflare,quad9" [default: google]
       --provider <PROVIDER>
-          Certificate provider. Allowed values are: certsh, censys. Default is certsh Can contain multiple values delimited by comma, ex --provider=certsh,censys [default: certsh]
+          Certificate provider. Allowed values are: certsh, censys. Default is certsh. Can contain multiple values delimited by comma, ex --provider=certsh,censys [default: certsh]
   -c, --config <CONFIG>
           Path to config file
   -h, --help

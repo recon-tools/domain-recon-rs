@@ -34,7 +34,7 @@ mod resolver;
 pub struct InputArgs {
     domain: String,
     certificate_providers: Vec<CertificateProvider>,
-    file: String,
+    file: Option<String>,
     use_system_resolver: bool,
     dns_resolvers: Vec<DNSResolver>,
     silent: bool,
@@ -45,7 +45,7 @@ impl InputArgs {
     pub fn new(
         domain: String,
         certificate_providers_str: &Vec<String>,
-        file: String,
+        file: Option<String>,
         use_system_resolver: bool,
         dns_resolvers_str: &Vec<String>,
         silent: bool,
@@ -109,7 +109,7 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 static BATCH_SIZE: usize = 200;
 
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
-    let steps = if input_args.file.is_empty() { 2 } else { 3 };
+    let steps = if input_args.file.is_none() { 2 } else { 3 };
 
     if !input_args.silent {
         println!(
@@ -157,8 +157,9 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
     let mut resolvable = get_resolvable_domains(&fqdns, &resolver, input_args.silent).await;
 
-    if !input_args.file.trim().is_empty() {
-        let words_path = Path::new(&input_args.file);
+    // If there is an input file for words, use it for extending domains, otherwise move forward
+    if let Some(words_file_str) = input_args.file {
+        let words_path = Path::new(&words_file_str);
         if !input_args.silent {
             println!(
                 "\n{} {}{}",
