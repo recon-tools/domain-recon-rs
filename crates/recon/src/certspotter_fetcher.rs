@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fmt::Debug;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,7 +17,7 @@ struct CertSpotterCertificate {
     pubkey_sha256: String,
     not_before: String,
     not_after: String,
-    revoked: bool
+    revoked: bool,
 }
 
 pub(crate) async fn fetch(
@@ -43,7 +43,7 @@ async fn fetch_certificates(
     api_key: &String,
 ) -> Result<Vec<CertSpotterCertificate>, reqwest::Error> {
     let client = reqwest::Client::new();
-    Ok(send_request(&client, domain,api_key).await?)
+    Ok(send_request(&client, domain, api_key).await?)
 }
 
 async fn send_request(
@@ -53,7 +53,11 @@ async fn send_request(
 ) -> Result<Vec<CertSpotterCertificate>, reqwest::Error> {
     client
         .get("https://api.certspotter.com/v1/issuances")
-        .query(&[("domain", domain.as_str()), ("include_subdomains", "true"), ("expand", "dns_names")])
+        .query(&[
+            ("domain", domain.as_str()),
+            ("include_subdomains", "true"),
+            ("expand", "dns_names"),
+        ])
         .header("Authorization", format!("Bearer {}", api_token))
         .send()
         .await?
