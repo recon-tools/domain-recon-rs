@@ -22,6 +22,7 @@ impl std::fmt::Display for UnknownCertificateProvider {
 pub(crate) enum CertificateProvider {
     CertSh,
     Censys,
+    CertSpotter,
 }
 
 impl FromStr for CertificateProvider {
@@ -31,6 +32,7 @@ impl FromStr for CertificateProvider {
         match input {
             "certsh" => Ok(CertificateProvider::CertSh),
             "censys" => Ok(CertificateProvider::Censys),
+            "certspotter" => Ok(CertificateProvider::CertSpotter),
             _ => return Err(UnknownCertificateProvider::new(input.to_string())),
         }
     }
