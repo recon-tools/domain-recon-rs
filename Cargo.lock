@@ -381,7 +381,7 @@ checksum = "3ee2393c4a91429dffb4bedf19f4d6abf27d8a732c8ce4980305d782e5426d57"
 
 [[package]]
 name = "domain-recon"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1170,7 +1170,7 @@ dependencies = [
 
 [[package]]
 name = "recon"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "addr",
  "anyhow",

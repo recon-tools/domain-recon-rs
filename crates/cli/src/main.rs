@@ -46,8 +46,8 @@ struct ReconArgs {
     )]
     dns_resolver: Vec<String>,
 
-    /// Certificate provider. Allowed values are: certsh, censys. Default is certsh.
-    /// Can contain multiple values delimited by comma, ex --provider=certsh,censys
+    /// Certificate provider. Allowed values are: certsh, censys, certspotter. Default is certsh.
+    /// Can contain multiple values delimited by comma, ex --provider=certsh,censys,certspotter
     #[clap(
         long,
         use_value_delimiter = true,

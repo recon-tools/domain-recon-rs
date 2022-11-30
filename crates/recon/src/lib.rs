@@ -22,11 +22,13 @@ use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
 use crate::certificate_provider::{CertificateProvider, UnknownCertificateProvider};
+use crate::certspotter_fetcher::CertSpotterConfig;
 use crate::resolver::{DNSResolver, UnknownDNSResolver};
 use serde::{Deserialize, Serialize};
 
 mod censys_fetcher;
 mod certificate_provider;
+mod certspotter_fetcher;
 mod crtsh_fetcher;
 mod resolver;
 
@@ -83,6 +85,7 @@ impl InputArgs {
 #[derive(Debug, Serialize, Deserialize)]
 struct DomainReconConfig {
     censys: Option<Vec<CensysConfig>>,
+    certspotter: Option<Vec<CertSpotterConfig>>,
 }
 
 #[derive(Debug)]
@@ -225,6 +228,20 @@ async fn fetch_certificates(
                     }
                     Some(censys) => {
                         futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
+                    }
+                }
+            }
+
+            if certificate_providers.contains(&CertificateProvider::CertSpotter) {
+                match config.certspotter {
+                    None => {
+                        println!("Warning! No censys credentials found!")
+                    }
+                    Some(certspotter) => {
+                        futures.push(Box::pin(certspotter_fetcher::fetch(
+                            domain.clone(),
+                            certspotter,
+                        )));
                     }
                 }
             }
