@@ -20,8 +20,8 @@ domain-recon -d wikipedia.org -f words.txt
 ![Example of usage GIF](images/example.gif)
 
 Currently, certificates are fetched from [crt.sh](https://crt.sh/) and [censys](https://search.censys.io/api). By default,
-`domain-recon` will use crt.sh only, censys being an additional option. In order to use censys, we have to provide a 
-configuration file, that contains our API token and a password. `domain-recond` reads this information from 
+`domain-recon` will use crt.sh only, censys and certspotter being additional options. In order to use censys or certspotter,
+we have to provide a configuration file, that contains our API credentials. `domain-recond` reads this information from 
 the `$HOME/domain-recon/config.json` folder. The structure of this file should be as follows:
 
 config.json
@@ -31,6 +31,11 @@ config.json
         {
             "app-id": "84f2fe92-9c4e...",
             "secret": "bmwjq...."
+        }
+    ],
+    "certspotter": [
+        {
+            "api-key": "k47370_..."
         }
     ]
 }
@@ -58,7 +63,7 @@ Options:
       --dns-resolver <DNS_RESOLVER>
           Specify a remote DNS resolver. Allowed values are: google, cloudflare, quad9. Default is google .Can contain multiple values delimited by comma, ex --dns-resolver="google,cloudflare,quad9" [default: google]
       --provider <PROVIDER>
-          Certificate provider. Allowed values are: certsh, censys. Default is certsh. Can contain multiple values delimited by comma, ex --provider=certsh,censys [default: certsh]
+          Certificate provider. Allowed values are: certsh, censys, certspotter. Default is certsh. Can contain multiple values delimited by comma, ex --provider=certsh,censys,certspotter [default: certsh]
   -c, --config <CONFIG>
           Path to config file
   -h, --help
