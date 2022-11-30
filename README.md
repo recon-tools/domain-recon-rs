@@ -75,6 +75,13 @@ Options:
 PS E:\Projects\rust\domain-recon-rs>
 ```
 
+## Download the Tool
+
+We can download the executable for this tool from the releases page: [https://github.com/recon-tools/domain-recon-rs/releases](https://github.com/recon-tools/domain-recon-rs/releases)
+Make sure we choose the right executable for our OS/architecture.
+
+Or we can simply build the project.
+
 ## Building the Project
 
 This project requires Rust 1.64 or above.
