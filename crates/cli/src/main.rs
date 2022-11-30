@@ -24,11 +24,11 @@ struct ReconArgs {
 
     /// Display results in plain form. Recommended, if the output is going to be provided as an
     /// input for another application.
-    #[clap(short, long, action, default_value="false")]
+    #[clap(short, long, action, default_value = "false")]
     plain: bool,
 
     /// Save output to csv.
-    #[clap(long, action, default_value="false")]
+    #[clap(long, action, default_value = "false")]
     csv: bool,
 
     /// Use default system DNS resolver.
