@@ -15,8 +15,7 @@ use async_std_resolver::{
 };
 use console::{style, Emoji};
 use futures::future::join_all;
-use futures::FutureExt;
-use itertools::Itertools;
+use futures::{FutureExt, StreamExt};
 use reqwest::Error;
 use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
@@ -41,6 +40,7 @@ pub struct InputArgs {
     dns_resolvers: Vec<DNSResolver>,
     silent: bool,
     config: Option<String>,
+    number_of_parallel_requests: usize,
 }
 
 impl InputArgs {
@@ -52,6 +52,7 @@ impl InputArgs {
         dns_resolvers_str: &Vec<String>,
         silent: bool,
         config: Option<String>,
+        number_of_parallel_requests: usize,
     ) -> anyhow::Result<InputArgs> {
         let certificate_providers_input: Result<
             Vec<CertificateProvider>,
@@ -78,6 +79,7 @@ impl InputArgs {
             dns_resolvers: dns_input.map_err(|e| anyhow!(e))?,
             silent,
             config,
+            number_of_parallel_requests,
         })
     }
 }
@@ -108,8 +110,6 @@ impl DomainInfo {
 static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "*");
 static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "*");
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
-
-static BATCH_SIZE: usize = 200;
 
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
     let steps = if input_args.file.is_none() { 2 } else { 3 };
@@ -158,7 +158,13 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
     let resolver =
         build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
-    let mut resolvable = get_resolvable_domains(&fqdns, &resolver, input_args.silent).await;
+    let mut resolvable = get_resolvable_domains(
+        &fqdns,
+        &resolver,
+        input_args.silent,
+        input_args.number_of_parallel_requests,
+    )
+    .await;
 
     // If there is an input file for words, use it for extending domains, otherwise move forward
     if let Some(words_file_str) = input_args.file {
@@ -174,7 +180,15 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
 
         let words = read_words(words_path).await?;
         if let Ok(domains) = expand_wildcards(&wildcards, &fqdns, &words).await {
-            resolvable.extend(get_resolvable_domains(&domains, &resolver, input_args.silent).await);
+            resolvable.extend(
+                get_resolvable_domains(
+                    &domains,
+                    &resolver,
+                    input_args.silent,
+                    input_args.number_of_parallel_requests,
+                )
+                .await,
+            );
         }
     }
 
@@ -332,33 +346,32 @@ async fn get_resolvable_domains(
     domains: &HashSet<String>,
     resolver: &AsyncStdResolver,
     silent: bool,
+    number_of_parallel_request: usize,
 ) -> Vec<LookupIp> {
     let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
 
     // Build chunks of records in order to avoid having to many opened connections.
-    let chunks = domains.into_iter().chunks(BATCH_SIZE);
-    for chunk in &chunks {
-        let futures = chunk
-            .into_iter()
-            .filter(|str| parse_domain_name(str).is_ok())
-            .map(|domain| {
-                resolver.lookup_ip(domain).then(|r| {
-                    // Display results as soon as they appear
-                    future::ready(match r {
-                        Ok(ip) => {
-                            pretty_print(&ip, silent);
-                            Ok(ip)
-                        }
-                        Err(e) => {
-                            // println!("{:?}", e);
-                            Err(e)
-                        }
-                    })
+    let futures = domains
+        .into_iter()
+        .filter(|str| parse_domain_name(str).is_ok())
+        .map(|domain| {
+            resolver.lookup_ip(domain).then(|r| {
+                // Display results as soon as they appear
+                future::ready(match r {
+                    Ok(ip) => {
+                        pretty_print(&ip, silent);
+                        Ok(ip)
+                    }
+                    Err(e) => {
+                        // println!("{:?}", e);
+                        Err(e)
+                    }
                 })
             })
-            .collect::<Vec<_>>();
-        result.extend(join_all(futures).await);
-    }
+        })
+        .collect::<Vec<_>>();
+    let stream = futures::stream::iter(futures).buffer_unordered(number_of_parallel_request);
+    result.extend(stream.collect::<Vec<_>>().await);
     result
         .iter()
         .filter(|res| res.is_ok())

@@ -56,9 +56,14 @@ struct ReconArgs {
     )]
     provider: Vec<String>,
 
-    /// Path to config file
+    /// Optional path to config file. If no path is given, certificate providers such as censys or
+    /// certspotter can not be used.
     #[clap(short, long, value_parser)]
     config: Option<String>,
+
+    /// Number of maximum parallel requests when doing DNS resolution.
+    #[arg(short, long, default_value_t = 10)]
+    number_of_parallel_requests: usize,
 }
 
 static BANNER: &str = r#"
@@ -87,6 +92,7 @@ async fn main() -> Result<(), anyhow::Error> {
         &args.dns_resolver,
         args.plain,
         args.config,
+        args.number_of_parallel_requests,
     )?;
 
     let result = run(input_args).await?;
