@@ -18,8 +18,8 @@ struct ReconArgs {
     domain: String,
 
     /// Words file for extending wildcard domains
-    #[clap(short, long, value_parser, default_value = "")]
-    file: String,
+    #[clap(short, long, value_parser)]
+    file: Option<String>,
 
     /// Display results in plain form
     #[clap(short, long, action)]
