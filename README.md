@@ -65,12 +65,22 @@ Options:
       --provider <PROVIDER>
           Certificate provider. Allowed values are: certsh, censys, certspotter. Default is certsh. Can contain multiple values delimited by comma, ex --provider=certsh,censys,certspotter [default: certsh]
   -c, --config <CONFIG>
-          Path to config file
+          Optional path to config file. If no path is given, certificate providers such as censys or certspotter can not be used
+  -n, --number-of-parallel-requests <NUMBER_OF_PARALLEL_REQUESTS>
+          Number of maximum parallel requests when doing DNS resolution [default: 10]
   -h, --help
           Print help information
   -V, --version
           Print version information
+PS E:\Projects\rust\domain-recon-rs>
 ```
+
+## Download the Tool
+
+We can download the executable for this tool from the releases page: [https://github.com/recon-tools/domain-recon-rs/releases](https://github.com/recon-tools/domain-recon-rs/releases)
+Make sure we choose the right executable for our OS/architecture.
+
+Or we can simply build the project.
 
 ## Building the Project
 
