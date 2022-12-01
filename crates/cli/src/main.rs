@@ -4,7 +4,7 @@ use std::string::String;
 use clap::Parser;
 use console::style;
 
-use recon::{run, InputArgs};
+use recon::{run, InputArgsBuilder};
 
 use crate::writer::{CsvWriter, StdWriter, Writer};
 
@@ -84,18 +84,17 @@ async fn main() -> Result<(), anyhow::Error> {
         println!("{}", style(BANNER).cyan().bold());
     }
 
-    let input_args = InputArgs::new(
-        args.domain,
-        &args.provider,
-        args.file,
-        args.use_system_resolver,
-        &args.dns_resolver,
-        args.plain,
-        args.config,
-        args.number_of_parallel_requests,
-    )?;
+    let input_args = InputArgsBuilder::new(args.domain)
+        .certificate_providers(&args.provider)
+        .file(args.file)
+        .use_system_resolver(args.use_system_resolver)
+        .dns_resolvers(&args.dns_resolver)
+        .silent(args.plain)
+        .config(args.config)
+        .number_of_parallel_requests(args.number_of_parallel_requests)
+        .build();
 
-    let result = run(input_args).await?;
+    let result = run(input_args?).await?;
 
     let mut writers: Vec<Box<dyn Writer>> = vec![];
     if args.plain {
