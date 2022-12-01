@@ -4,11 +4,9 @@ use std::future;
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
-use std::str::FromStr;
 
 use crate::censys_fetcher::CensysConfig;
 use addr::parse_domain_name;
-use anyhow::anyhow;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -20,69 +18,18 @@ use reqwest::Error;
 use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
-use crate::certificate_provider::{CertificateProvider, UnknownCertificateProvider};
+use crate::certificate_provider::CertificateProvider;
 use crate::certspotter_fetcher::CertSpotterConfig;
-use crate::resolver::{DNSResolver, UnknownDNSResolver};
+pub use crate::input_args::{InputArgs, InputArgsBuilder};
+use crate::resolver::DNSResolver;
 use serde::{Deserialize, Serialize};
 
 mod censys_fetcher;
 mod certificate_provider;
 mod certspotter_fetcher;
 mod crtsh_fetcher;
+mod input_args;
 mod resolver;
-
-#[derive(Debug)]
-pub struct InputArgs {
-    domain: String,
-    certificate_providers: Vec<CertificateProvider>,
-    file: Option<String>,
-    use_system_resolver: bool,
-    dns_resolvers: Vec<DNSResolver>,
-    silent: bool,
-    config: Option<String>,
-    number_of_parallel_requests: usize,
-}
-
-impl InputArgs {
-    pub fn new(
-        domain: String,
-        certificate_providers_str: &Vec<String>,
-        file: Option<String>,
-        use_system_resolver: bool,
-        dns_resolvers_str: &Vec<String>,
-        silent: bool,
-        config: Option<String>,
-        number_of_parallel_requests: usize,
-    ) -> anyhow::Result<InputArgs> {
-        let certificate_providers_input: Result<
-            Vec<CertificateProvider>,
-            UnknownCertificateProvider,
-        > = certificate_providers_str
-            .iter()
-            .map(|provider| CertificateProvider::from_str(provider))
-            .collect();
-
-        let dns_input: Result<Vec<DNSResolver>, UnknownDNSResolver> = if !use_system_resolver {
-            dns_resolvers_str
-                .iter()
-                .map(|resolver| DNSResolver::from_str(resolver))
-                .collect()
-        } else {
-            Ok(vec![])
-        };
-
-        Ok(InputArgs {
-            domain,
-            certificate_providers: certificate_providers_input.map_err(|e| anyhow!(e))?,
-            file,
-            use_system_resolver,
-            dns_resolvers: dns_input.map_err(|e| anyhow!(e))?,
-            silent,
-            config,
-            number_of_parallel_requests,
-        })
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DomainReconConfig {
