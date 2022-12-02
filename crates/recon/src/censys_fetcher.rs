@@ -1,3 +1,4 @@
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -10,7 +11,7 @@ pub(crate) struct CensysConfig {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct Request {
     query: String,
     page: i32,
@@ -44,6 +45,8 @@ struct CensysResponse {
     metadata: MetaData,
     results: Vec<ParsedResult>,
 }
+
+const MAX_PARALLEL_REQUESTS: usize = 10;
 
 pub(crate) async fn fetch(
     domain: String,
@@ -85,9 +88,9 @@ async fn fetch_certificates(
 ) -> Result<Vec<CensysResponse>, reqwest::Error> {
     let client = reqwest::Client::new();
 
-    let mut request = Request {
+    let create_request = |page: i32| Request {
         query: format!("validation.nss.valid: true and parsed.names: {}", domain),
-        page: 1,
+        page: page as i32,
         flatten: true,
         fields: vec![
             String::from("parsed.names"),
@@ -95,24 +98,34 @@ async fn fetch_certificates(
         ],
     };
 
-    let response = send_request(&client, &request, api_id, secret).await?;
-    let pages = response.metadata.pages;
+    let first_response = send_request(&client, create_request(1), api_id, secret).await?;
 
-    let mut responses = vec![response];
-    for i in 2..pages {
-        request.page = i;
-        responses.push(send_request(&client, &request, api_id, secret).await?);
-    }
+    let future_responses = (2..first_response.metadata.pages)
+        .map(|i| send_request(&client, create_request(i), api_id, secret))
+        .collect::<Vec<_>>();
+
+    let stream = futures::stream::iter(future_responses).buffer_unordered(MAX_PARALLEL_REQUESTS);
+    let results = stream
+        .collect::<Vec<Result<CensysResponse, reqwest::Error>>>()
+        .await;
+
+    let mut responses = vec![first_response];
+    responses.extend(
+        results
+            .into_iter()
+            .filter(|response| response.is_ok())
+            .map(|response| response.unwrap()),
+    );
 
     Ok(responses)
 }
 
 async fn send_request(
     client: &reqwest::Client,
-    request: &Request,
+    request: Request,
     api_id: &String,
     secret: &String,
-) -> Result<CensysResponse, reqwest::Error> {
+) -> anyhow::Result<CensysResponse, reqwest::Error> {
     client
         .post("https://search.censys.io/api/v1/search/certificates")
         .json(&request)
