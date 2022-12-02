@@ -7,6 +7,7 @@ use std::pin::Pin;
 
 use crate::censys_fetcher::CensysConfig;
 use addr::parse_domain_name;
+use anyhow::anyhow;
 use async_std_resolver::lookup_ip::LookupIp;
 use async_std_resolver::{
     config, resolver, resolver_from_system_conf, AsyncStdResolver, ResolveError,
@@ -19,6 +20,7 @@ use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
 use crate::certificate_provider::CertificateProvider;
+use crate::certificate_provider::CertificateProvider::{Censys, CertSpotter};
 use crate::certspotter_fetcher::CertSpotterConfig;
 pub use crate::input_args::{InputArgs, InputArgsBuilder};
 use crate::resolver::DNSResolver;
@@ -58,6 +60,8 @@ static LOOKING_GLASS: Emoji<'_, '_> = Emoji("🔍  ", "*");
 static CLIP: Emoji<'_, '_> = Emoji("🔗  ", "*");
 static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 
+static PROVIDERS_WITH_CONFIG: [CertificateProvider; 2] = [Censys, CertSpotter];
+
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
     let steps = if input_args.file.is_none() { 2 } else { 3 };
 
@@ -79,27 +83,32 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         );
     }
 
+    // Get the default $HOME path depending on the operating system
     let default_home_path = match home::home_dir() {
         Some(path) => path.join("domain-recon").join("config.json"),
         None => Path::new(".").to_path_buf(),
     };
 
+    // Build the path for the config file
     let config_path = input_args.config.map_or(default_home_path, |path_str| {
         Path::new(&path_str).to_path_buf()
     });
 
-    let config = match read_config(config_path).await {
-        Ok(c) => Some(c),
-        Err(e) => {
-            if input_args
-                .certificate_providers
-                .contains(&CertificateProvider::Censys)
-            {
-                println!("Warning: Config file could not be read: {:}", e.to_string());
-            }
-            None
-        }
+    // Attempt to read the config file. The config file may not be present
+    let config = if config_path.exists() {
+        Some(read_config(config_path).await?)
+    } else {
+        None
     };
+
+    // Validate the config file, return if there are errors
+    validate_config(
+        &config,
+        PROVIDERS_WITH_CONFIG
+            .iter()
+            .filter(|provider| input_args.certificate_providers.contains(provider))
+            .collect::<Vec<_>>(),
+    )?;
 
     let (wildcards, fqdns) =
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
@@ -139,7 +148,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         }
     }
 
-    let result = resolvable
+    Ok(resolvable
         .iter()
         .map(|lookup| {
             let records = lookup
@@ -152,15 +161,59 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
                 records,
             )
         })
-        .collect();
-
-    Ok(result)
+        .collect())
 }
 
 async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::Error> {
     let contents = read_to_string(path).await?;
     let config = serde_json::from_str::<DomainReconConfig>(&*contents)?;
     Ok(config)
+}
+
+// Validate input configuration file. Depending on the --provider flag, this function should validate
+// if the requested providers have secrets in the configuration file.
+fn validate_config(
+    config: &Option<DomainReconConfig>,
+    mandatory_config: Vec<&CertificateProvider>,
+) -> Result<(), anyhow::Error> {
+    if !mandatory_config.is_empty() {
+        match &config {
+            None => return Err(anyhow!("Config file is required!")),
+            Some(file) => {
+                if mandatory_config.contains(&&Censys)
+                    && (file.censys.is_none()
+                        || file.censys.is_none()
+                        || file
+                            .certspotter
+                            .as_ref()
+                            .map(|v| v.len())
+                            .iter()
+                            .sum::<usize>()
+                            <= 0)
+                {
+                    return Err(anyhow!(
+                        "Censys requires secrets in the configuration file!"
+                    ));
+                }
+                if mandatory_config.contains(&&CertSpotter)
+                    && (file.certspotter.is_none()
+                        || file
+                            .certspotter
+                            .as_ref()
+                            .map(|v| v.len())
+                            .iter()
+                            .sum::<usize>()
+                            <= 0)
+                {
+                    return Err(anyhow!(
+                        "Certspotter requires secrets in the configuration file!"
+                    ));
+                }
+            }
+        };
+    }
+
+    Ok(())
 }
 
 async fn fetch_certificates(
@@ -182,7 +235,7 @@ async fn fetch_certificates(
     match config {
         None => {}
         Some(config) => {
-            if certificate_providers.contains(&CertificateProvider::Censys) {
+            if certificate_providers.contains(&Censys) {
                 match config.censys {
                     None => {
                         println!("Warning! No censys credentials found!")
@@ -193,7 +246,7 @@ async fn fetch_certificates(
                 }
             }
 
-            if certificate_providers.contains(&CertificateProvider::CertSpotter) {
+            if certificate_providers.contains(&CertSpotter) {
                 match config.certspotter {
                     None => {
                         println!("Warning! No certspotter credentials found!")
@@ -207,9 +260,7 @@ async fn fetch_certificates(
                 }
             }
 
-            let results = join_all(futures).await;
-
-            for result in results {
+            for result in join_all(futures).await {
                 match result {
                     Ok((w, f)) => {
                         wildcards.extend(w);
