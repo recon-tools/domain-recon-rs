@@ -182,14 +182,7 @@ fn validate_config(
             Some(file) => {
                 if mandatory_config.contains(&&Censys)
                     && (file.censys.is_none()
-                        || file.censys.is_none()
-                        || file
-                            .certspotter
-                            .as_ref()
-                            .map(|v| v.len())
-                            .iter()
-                            .sum::<usize>()
-                            <= 0)
+                        || file.censys.as_ref().map(|v| v.len()).iter().sum::<usize>() <= 0)
                 {
                     return Err(anyhow!(
                         "Censys requires secrets in the configuration file!"
@@ -395,6 +388,44 @@ fn pretty_print(lookup: &LookupIp, silent: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_validate_config_missing_config() {
+        let config = DomainReconConfig {
+            censys: None,
+            certspotter: None,
+        };
+        let required_providers = vec![&Censys, &CertSpotter];
+        let res = validate_config(&Some(config), required_providers);
+        assert_eq!(false, res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_config_censys() {
+        let config = DomainReconConfig {
+            censys: Option::from(vec![CensysConfig {
+                app_id: "".to_string(),
+                secret: "".to_string(),
+            }]),
+            certspotter: None,
+        };
+        let required_providers = vec![&Censys];
+        let res = validate_config(&Some(config), required_providers);
+        assert_eq!(true, res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_validate_config_certspotter() {
+        let config = DomainReconConfig {
+            censys: None,
+            certspotter: Option::from(vec![CertSpotterConfig {
+                api_key: "".to_string(),
+            }]),
+        };
+        let required_providers = vec![&CertSpotter];
+        let res = validate_config(&Some(config), required_providers);
+        assert_eq!(true, res.is_ok());
+    }
 
     #[tokio::test]
     async fn test_expand_wildcards() {

@@ -6,8 +6,8 @@ use std::fmt::Debug;
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct CensysConfig {
     #[serde(rename = "app-id")]
-    app_id: String,
-    secret: String,
+    pub(crate) app_id: String,
+    pub(crate) secret: String,
 }
 
 #[allow(dead_code)]
