@@ -196,7 +196,7 @@ async fn fetch_certificates(
             if certificate_providers.contains(&CertificateProvider::CertSpotter) {
                 match config.certspotter {
                     None => {
-                        println!("Warning! No censys credentials found!")
+                        println!("Warning! No certspotter credentials found!")
                     }
                     Some(certspotter) => {
                         futures.push(Box::pin(certspotter_fetcher::fetch(
