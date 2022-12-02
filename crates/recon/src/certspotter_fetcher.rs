@@ -5,7 +5,7 @@ use std::fmt::Debug;
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct CertSpotterConfig {
     #[serde(rename = "api-key")]
-    api_key: String,
+    pub(crate) api_key: String,
 }
 
 #[allow(dead_code)]
