@@ -1,3 +1,6 @@
+use crate::config_validator::{
+    CensysConfigValidator, CertSpotterConfigValidator, ConfigValidator, CrtShConfigValidator,
+};
 use std::str::FromStr;
 
 #[derive(Debug)]
@@ -34,6 +37,16 @@ impl FromStr for CertificateProvider {
             "censys" => Ok(CertificateProvider::Censys),
             "certspotter" => Ok(CertificateProvider::CertSpotter),
             _ => return Err(UnknownCertificateProvider::new(input.to_string())),
+        }
+    }
+}
+
+impl CertificateProvider {
+    pub(crate) fn config_validator(&self) -> Box<dyn ConfigValidator> {
+        match self {
+            CertificateProvider::CertSh => Box::new(CrtShConfigValidator {}),
+            CertificateProvider::Censys => Box::new(CensysConfigValidator {}),
+            CertificateProvider::CertSpotter => Box::new(CertSpotterConfigValidator {}),
         }
     }
 }

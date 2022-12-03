@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 mod censys_fetcher;
 mod certificate_provider;
 mod certspotter_fetcher;
+mod config_validator;
 mod crtsh_fetcher;
 mod input_args;
 mod resolver;
@@ -63,6 +64,26 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 static PROVIDERS_WITH_CONFIG: [CertificateProvider; 2] = [Censys, CertSpotter];
 
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
+    // Get the default $HOME path depending on the operating system
+    let default_home_path = match home::home_dir() {
+        Some(path) => path.join("domain-recon").join("config.json"),
+        None => Path::new(".").to_path_buf(),
+    };
+
+    // Build the path for the config file
+    let config_path = input_args.config.map_or(default_home_path, |path_str| {
+        Path::new(&path_str).to_path_buf()
+    });
+
+    // Attempt to read the config file. The config file may not be present
+    let config = if config_path.exists() {
+        Some(read_config(config_path).await?)
+    } else {
+        None
+    };
+
+    validate_config(&config, &input_args.certificate_providers)?;
+
     let steps = if input_args.file.is_none() { 2 } else { 3 };
 
     if !input_args.silent {
@@ -82,33 +103,6 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
             style("Extracting valid domains...").bold()
         );
     }
-
-    // Get the default $HOME path depending on the operating system
-    let default_home_path = match home::home_dir() {
-        Some(path) => path.join("domain-recon").join("config.json"),
-        None => Path::new(".").to_path_buf(),
-    };
-
-    // Build the path for the config file
-    let config_path = input_args.config.map_or(default_home_path, |path_str| {
-        Path::new(&path_str).to_path_buf()
-    });
-
-    // Attempt to read the config file. The config file may not be present
-    let config = if config_path.exists() {
-        Some(read_config(config_path).await?)
-    } else {
-        None
-    };
-
-    // Validate the config file, return if there are errors
-    validate_config(
-        &config,
-        PROVIDERS_WITH_CONFIG
-            .iter()
-            .filter(|provider| input_args.certificate_providers.contains(provider))
-            .collect::<Vec<_>>(),
-    )?;
 
     let (wildcards, fqdns) =
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
@@ -174,36 +168,35 @@ async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::E
 // if the requested providers have secrets in the configuration file.
 fn validate_config(
     config: &Option<DomainReconConfig>,
-    mandatory_config: Vec<&CertificateProvider>,
+    providers: &Vec<CertificateProvider>,
 ) -> Result<(), anyhow::Error> {
-    if !mandatory_config.is_empty() {
-        match &config {
-            None => return Err(anyhow!("Config file is required!")),
-            Some(file) => {
-                if mandatory_config.contains(&&Censys)
-                    && (file.censys.is_none()
-                        || file.censys.as_ref().map(|v| v.len()).iter().sum::<usize>() <= 0)
-                {
-                    return Err(anyhow!(
-                        "Censys requires secrets in the configuration file!"
-                    ));
-                }
-                if mandatory_config.contains(&&CertSpotter)
-                    && (file.certspotter.is_none()
-                        || file
-                            .certspotter
-                            .as_ref()
-                            .map(|v| v.len())
-                            .iter()
-                            .sum::<usize>()
-                            <= 0)
-                {
-                    return Err(anyhow!(
-                        "Certspotter requires secrets in the configuration file!"
-                    ));
-                }
+    match config {
+        None => {
+            if providers
+                .iter()
+                .any(move |provider| PROVIDERS_WITH_CONFIG.contains(provider))
+            {
+                return Err(anyhow!("No config file provided!"));
             }
-        };
+        }
+        Some(recon_config) => {
+            // Validate the config file, return if there are errors
+            let validation_results = providers
+                .into_iter()
+                .map(|certificate_provider| {
+                    certificate_provider
+                        .config_validator()
+                        .validate(&recon_config)
+                })
+                .filter(|result| result.is_err())
+                .collect::<Vec<_>>();
+
+            if !validation_results.is_empty() {
+                // Return only the first error for now!
+                let error = validation_results.into_iter().next().unwrap();
+                return Err(anyhow!(error.unwrap_err().to_string()));
+            }
+        }
     }
 
     Ok(())
@@ -212,7 +205,7 @@ fn validate_config(
 async fn fetch_certificates(
     certificate_providers: &Vec<CertificateProvider>,
     domain: String,
-    config: Option<DomainReconConfig>,
+    optional_config: Option<DomainReconConfig>,
 ) -> Result<(HashSet<String>, HashSet<String>), Error> {
     type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
 
@@ -225,46 +218,33 @@ async fn fetch_certificates(
         futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
     }
 
-    match config {
-        None => {}
-        Some(config) => {
-            if certificate_providers.contains(&Censys) {
-                match config.censys {
-                    None => {
-                        println!("Warning! No censys credentials found!")
-                    }
-                    Some(censys) => {
-                        futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
-                    }
-                }
-            }
-
-            if certificate_providers.contains(&CertSpotter) {
-                match config.certspotter {
-                    None => {
-                        println!("Warning! No certspotter credentials found!")
-                    }
-                    Some(certspotter) => {
-                        futures.push(Box::pin(certspotter_fetcher::fetch(
-                            domain.clone(),
-                            certspotter,
-                        )));
-                    }
-                }
-            }
-
-            for result in join_all(futures).await {
-                match result {
-                    Ok((w, f)) => {
-                        wildcards.extend(w);
-                        fqdns.extend(f);
-                    }
-                    Err(e) => {
-                        println!("Could not fetch for {}", e);
-                    }
-                };
+    if let Some(config) = optional_config {
+        if certificate_providers.contains(&Censys) {
+            if let Some(censys) = config.censys {
+                futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
             }
         }
+
+        if certificate_providers.contains(&CertSpotter) {
+            if let Some(certspotter) = config.certspotter {
+                futures.push(Box::pin(certspotter_fetcher::fetch(
+                    domain.clone(),
+                    certspotter,
+                )));
+            }
+        }
+    }
+
+    for result in join_all(futures).await {
+        match result {
+            Ok((w, f)) => {
+                wildcards.extend(w);
+                fqdns.extend(f);
+            }
+            Err(e) => {
+                println!("Could not fetch for {}", e);
+            }
+        };
     }
 
     Ok((wildcards, fqdns))
@@ -395,8 +375,8 @@ mod tests {
             censys: None,
             certspotter: None,
         };
-        let required_providers = vec![&Censys, &CertSpotter];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![Censys, CertSpotter];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(false, res.is_ok());
     }
 
@@ -409,8 +389,8 @@ mod tests {
             }]),
             certspotter: None,
         };
-        let required_providers = vec![&Censys];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![Censys];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(true, res.is_ok());
     }
 
@@ -422,8 +402,8 @@ mod tests {
                 api_key: "".to_string(),
             }]),
         };
-        let required_providers = vec![&CertSpotter];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![CertSpotter];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(true, res.is_ok());
     }
 
