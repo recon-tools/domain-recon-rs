@@ -29,10 +29,10 @@ use serde::{Deserialize, Serialize};
 mod censys_fetcher;
 mod certificate_provider;
 mod certspotter_fetcher;
+mod config_validator;
 mod crtsh_fetcher;
 mod input_args;
 mod resolver;
-mod config_validator;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DomainReconConfig {
@@ -102,14 +102,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         None
     };
 
-    // Validate the config file, return if there are errors
-    validate_config(
-        &config,
-        PROVIDERS_WITH_CONFIG
-            .iter()
-            .filter(|provider| input_args.certificate_providers.contains(provider))
-            .collect::<Vec<_>>(),
-    )?;
+    validate_config(&config, &input_args.certificate_providers)?;
 
     let (wildcards, fqdns) =
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
@@ -175,36 +168,32 @@ async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::E
 // if the requested providers have secrets in the configuration file.
 fn validate_config(
     config: &Option<DomainReconConfig>,
-    mandatory_config: Vec<&CertificateProvider>,
+    providers: &Vec<CertificateProvider>,
 ) -> Result<(), anyhow::Error> {
-    if !mandatory_config.is_empty() {
-        match &config {
-            None => return Err(anyhow!("Config file is required!")),
-            Some(file) => {
-                if mandatory_config.contains(&&Censys)
-                    && (file.censys.is_none()
-                        || file.censys.as_ref().map(|v| v.len()).iter().sum::<usize>() <= 0)
-                {
-                    return Err(anyhow!(
-                        "Censys requires secrets in the configuration file!"
-                    ));
-                }
-                if mandatory_config.contains(&&CertSpotter)
-                    && (file.certspotter.is_none()
-                        || file
-                            .certspotter
-                            .as_ref()
-                            .map(|v| v.len())
-                            .iter()
-                            .sum::<usize>()
-                            <= 0)
-                {
-                    return Err(anyhow!(
-                        "CertSpotter requires secrets in the configuration file!"
-                    ));
-                }
+    match config {
+        None => {
+            if providers
+                .iter()
+                .any(move |provider| PROVIDERS_WITH_CONFIG.contains(provider))
+            {
+                return Err(anyhow!("No config file provided!"));
             }
-        };
+        }
+        Some(recon_config) => {
+            // Validate the config file, return if there are errors
+            let validation_results = providers
+                .into_iter()
+                .map(|certificate_provider| certificate_provider.config_validator())
+                .map(|config_validator| config_validator.validate(&recon_config))
+                .filter(|result| result.is_err())
+                .collect::<Vec<_>>();
+
+            if !validation_results.is_empty() {
+                // Return only the first error for now!
+                let error = validation_results.into_iter().next().unwrap();
+                return Err(anyhow!(error.unwrap_err().to_string()));
+            }
+        }
     }
 
     Ok(())
@@ -396,8 +385,8 @@ mod tests {
             censys: None,
             certspotter: None,
         };
-        let required_providers = vec![&Censys, &CertSpotter];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![Censys, CertSpotter];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(false, res.is_ok());
     }
 
@@ -410,8 +399,8 @@ mod tests {
             }]),
             certspotter: None,
         };
-        let required_providers = vec![&Censys];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![Censys];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(true, res.is_ok());
     }
 
@@ -423,8 +412,8 @@ mod tests {
                 api_key: "".to_string(),
             }]),
         };
-        let required_providers = vec![&CertSpotter];
-        let res = validate_config(&Some(config), required_providers);
+        let providers = vec![CertSpotter];
+        let res = validate_config(&Some(config), &providers);
         assert_eq!(true, res.is_ok());
     }
 

@@ -1,5 +1,7 @@
+use crate::config_validator::{
+    CensysConfigValidator, CertSpotterConfigValidator, ConfigValidator, CrtShConfigValidator,
+};
 use std::str::FromStr;
-use crate::config_validator::{CensysConfigValidator, CertSpotterConfigValidator, CertSpotterValidator, ConfigValidator, CrtShConfigValidator, CrtShValidator};
 
 #[derive(Debug)]
 #[allow(dead_code, unused_variables)]
@@ -44,7 +46,7 @@ impl CertificateProvider {
         match self {
             CertificateProvider::CertSh => Box::new(CrtShConfigValidator {}),
             CertificateProvider::Censys => Box::new(CensysConfigValidator {}),
-            CertificateProvider::CertSpotter => Box::new(CertSpotterConfigValidator {})
+            CertificateProvider::CertSpotter => Box::new(CertSpotterConfigValidator {}),
         }
     }
 }
