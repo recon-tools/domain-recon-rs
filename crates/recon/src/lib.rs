@@ -66,7 +66,10 @@ static PROVIDERS_WITH_CONFIG: [CertificateProvider; 2] = [Censys, CertSpotter];
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
     // Get the default $HOME path depending on the operating system
     let default_home_path = match home::home_dir() {
-        Some(path) => path.join("domain-recon").join("config.json"),
+        Some(path) => path
+            .join(".config")
+            .join("domain-recon")
+            .join("config.json"),
         None => Path::new(".").to_path_buf(),
     };
 
@@ -95,6 +98,11 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         );
     }
 
+    let (wildcards, fqdns) =
+        fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
+    let resolver =
+        build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
+
     if !input_args.silent {
         println!(
             "\n{} {}{}",
@@ -104,10 +112,6 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         );
     }
 
-    let (wildcards, fqdns) =
-        fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
-    let resolver =
-        build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
     let mut resolvable = get_resolvable_domains(
         &fqdns,
         &resolver,
