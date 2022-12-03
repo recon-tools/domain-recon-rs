@@ -183,8 +183,11 @@ fn validate_config(
             // Validate the config file, return if there are errors
             let validation_results = providers
                 .into_iter()
-                .map(|certificate_provider| certificate_provider.config_validator())
-                .map(|config_validator| config_validator.validate(&recon_config))
+                .map(|certificate_provider| {
+                    certificate_provider
+                        .config_validator()
+                        .validate(&recon_config)
+                })
                 .filter(|result| result.is_err())
                 .collect::<Vec<_>>();
 
@@ -202,7 +205,7 @@ fn validate_config(
 async fn fetch_certificates(
     certificate_providers: &Vec<CertificateProvider>,
     domain: String,
-    config: Option<DomainReconConfig>,
+    optional_config: Option<DomainReconConfig>,
 ) -> Result<(HashSet<String>, HashSet<String>), Error> {
     type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
 
@@ -215,46 +218,33 @@ async fn fetch_certificates(
         futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
     }
 
-    match config {
-        None => {}
-        Some(config) => {
-            if certificate_providers.contains(&Censys) {
-                match config.censys {
-                    None => {
-                        println!("Warning! No Censys credentials found!")
-                    }
-                    Some(censys) => {
-                        futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
-                    }
-                }
-            }
-
-            if certificate_providers.contains(&CertSpotter) {
-                match config.certspotter {
-                    None => {
-                        println!("Warning! No CertSpotter credentials found!")
-                    }
-                    Some(certspotter) => {
-                        futures.push(Box::pin(certspotter_fetcher::fetch(
-                            domain.clone(),
-                            certspotter,
-                        )));
-                    }
-                }
-            }
-
-            for result in join_all(futures).await {
-                match result {
-                    Ok((w, f)) => {
-                        wildcards.extend(w);
-                        fqdns.extend(f);
-                    }
-                    Err(e) => {
-                        println!("Could not fetch for {}", e);
-                    }
-                };
+    if let Some(config) = optional_config {
+        if certificate_providers.contains(&Censys) {
+            if let Some(censys) = config.censys {
+                futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
             }
         }
+
+        if certificate_providers.contains(&CertSpotter) {
+            if let Some(certspotter) = config.certspotter {
+                futures.push(Box::pin(certspotter_fetcher::fetch(
+                    domain.clone(),
+                    certspotter,
+                )));
+            }
+        }
+    }
+
+    for result in join_all(futures).await {
+        match result {
+            Ok((w, f)) => {
+                wildcards.extend(w);
+                fqdns.extend(f);
+            }
+            Err(e) => {
+                println!("Could not fetch for {}", e);
+            }
+        };
     }
 
     Ok((wildcards, fqdns))

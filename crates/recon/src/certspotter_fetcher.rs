@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct CertSpotterConfig {
@@ -24,7 +24,7 @@ pub(crate) async fn fetch(
     domain: String,
     config: Vec<CertSpotterConfig>,
 ) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
-    let response = fetch_certificates(&domain, &config[0].api_key).await?;
+    let response = get_certificates(&domain, &config[0].api_key).await?;
 
     let all_domains = response
         .into_iter()
@@ -38,23 +38,29 @@ pub(crate) async fn fetch(
     Ok((wildcards, fqdns))
 }
 
-async fn fetch_certificates(
-    domain: &String,
-    api_key: &String,
-) -> Result<Vec<CertSpotterCertificate>, reqwest::Error> {
+async fn get_certificates<S>(
+    domain: S,
+    api_key: S,
+) -> Result<Vec<CertSpotterCertificate>, reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
     let client = reqwest::Client::new();
     Ok(send_request(&client, domain, api_key).await?)
 }
 
-async fn send_request(
+async fn send_request<S>(
     client: &reqwest::Client,
-    domain: &String,
-    api_token: &String,
-) -> Result<Vec<CertSpotterCertificate>, reqwest::Error> {
+    domain: S,
+    api_token: S,
+) -> Result<Vec<CertSpotterCertificate>, reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
     client
         .get("https://api.certspotter.com/v1/issuances")
         .query(&[
-            ("domain", domain.as_str()),
+            ("domain", domain.as_ref()),
             ("include_subdomains", "true"),
             ("expand", "dns_names"),
         ])

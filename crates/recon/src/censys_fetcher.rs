@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct CensysConfig {
@@ -54,7 +54,7 @@ pub(crate) async fn fetch(
 ) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
     let CensysConfig { app_id, secret } = &config[0];
 
-    let responses = fetch_certificates(&domain, app_id, secret).await?;
+    let responses = get_certificates(&domain, app_id, secret).await?;
 
     let all_domains = responses
         .into_iter()
@@ -81,11 +81,14 @@ pub(crate) async fn fetch(
     Ok((wildcards, fqdns))
 }
 
-async fn fetch_certificates(
-    domain: &str,
-    api_id: &String,
-    secret: &String,
-) -> Result<Vec<CensysResponse>, reqwest::Error> {
+async fn get_certificates<S>(
+    domain: S,
+    api_id: S,
+    secret: S,
+) -> Result<Vec<CensysResponse>, reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
     let client = reqwest::Client::new();
 
     let create_request = |page: i32| Request {
@@ -98,10 +101,10 @@ async fn fetch_certificates(
         ],
     };
 
-    let first_response = send_request(&client, create_request(1), api_id, secret).await?;
+    let first_response = send_request(&client, create_request(1), &api_id, &secret).await?;
 
     let future_responses = (2..first_response.metadata.pages)
-        .map(|i| send_request(&client, create_request(i), api_id, secret))
+        .map(|i| send_request(&client, create_request(i), &api_id, &secret))
         .collect::<Vec<_>>();
 
     let stream = futures::stream::iter(future_responses).buffer_unordered(MAX_PARALLEL_REQUESTS);
@@ -120,12 +123,15 @@ async fn fetch_certificates(
     Ok(responses)
 }
 
-async fn send_request(
+async fn send_request<S>(
     client: &reqwest::Client,
     request: Request,
-    api_id: &String,
-    secret: &String,
-) -> anyhow::Result<CensysResponse, reqwest::Error> {
+    api_id: S,
+    secret: S,
+) -> anyhow::Result<CensysResponse, reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
     client
         .post("https://search.censys.io/api/v1/search/certificates")
         .json(&request)

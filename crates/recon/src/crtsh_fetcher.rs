@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -16,8 +16,11 @@ struct Certificate {
     serial_number: String,
 }
 
-pub(crate) async fn fetch(domain: String) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
-    let certificates = fetch_certificates(&domain).await?;
+pub(crate) async fn fetch<S>(domain: S) -> Result<(Vec<String>, Vec<String>), reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
+    let certificates = get_certificates(&domain).await?;
 
     let mut domains: HashSet<String> = HashSet::new();
     for certificate in certificates {
@@ -38,11 +41,18 @@ pub(crate) async fn fetch(domain: String) -> Result<(Vec<String>, Vec<String>), 
     Ok((wildcards, fqdns))
 }
 
-async fn fetch_certificates(domain: &str) -> Result<Vec<Certificate>, reqwest::Error> {
+async fn get_certificates<S>(domain: S) -> Result<Vec<Certificate>, reqwest::Error>
+where
+    S: AsRef<str> + Display,
+{
     let client = reqwest::Client::new();
     let response = client
         .get("https://crt.sh")
-        .query(&[("q", domain), ("output", "json"), ("excluded", "expired")])
+        .query(&[
+            ("q", domain.as_ref()),
+            ("output", "json"),
+            ("excluded", "expired"),
+        ])
         .send()
         .await;
     response?.json::<Vec<Certificate>>().await
