@@ -64,26 +64,6 @@ static SPARKLE: Emoji<'_, '_> = Emoji("✨ ", "*");
 static PROVIDERS_WITH_CONFIG: [CertificateProvider; 2] = [Censys, CertSpotter];
 
 pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
-    let steps = if input_args.file.is_none() { 2 } else { 3 };
-
-    if !input_args.silent {
-        println!(
-            "{} {}{}",
-            style(format!("[1/{}]", steps)).bold().dim(),
-            LOOKING_GLASS,
-            style("Fetching certificates...").bold()
-        );
-    }
-
-    if !input_args.silent {
-        println!(
-            "\n{} {}{}",
-            style(format!("[2/{}]", steps)).bold().dim(),
-            CLIP,
-            style("Extracting valid domains...").bold()
-        );
-    }
-
     // Get the default $HOME path depending on the operating system
     let default_home_path = match home::home_dir() {
         Some(path) => path.join("domain-recon").join("config.json"),
@@ -103,6 +83,26 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
     };
 
     validate_config(&config, &input_args.certificate_providers)?;
+
+    let steps = if input_args.file.is_none() { 2 } else { 3 };
+
+    if !input_args.silent {
+        println!(
+            "{} {}{}",
+            style(format!("[1/{}]", steps)).bold().dim(),
+            LOOKING_GLASS,
+            style("Fetching certificates...").bold()
+        );
+    }
+
+    if !input_args.silent {
+        println!(
+            "\n{} {}{}",
+            style(format!("[2/{}]", steps)).bold().dim(),
+            CLIP,
+            style("Extracting valid domains...").bold()
+        );
+    }
 
     let (wildcards, fqdns) =
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
