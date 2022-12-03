@@ -32,6 +32,7 @@ mod certspotter_fetcher;
 mod crtsh_fetcher;
 mod input_args;
 mod resolver;
+mod config_validator;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct DomainReconConfig {
@@ -199,7 +200,7 @@ fn validate_config(
                             <= 0)
                 {
                     return Err(anyhow!(
-                        "Certspotter requires secrets in the configuration file!"
+                        "CertSpotter requires secrets in the configuration file!"
                     ));
                 }
             }
@@ -231,7 +232,7 @@ async fn fetch_certificates(
             if certificate_providers.contains(&Censys) {
                 match config.censys {
                     None => {
-                        println!("Warning! No censys credentials found!")
+                        println!("Warning! No Censys credentials found!")
                     }
                     Some(censys) => {
                         futures.push(Box::pin(censys_fetcher::fetch(domain.clone(), censys)));
@@ -242,7 +243,7 @@ async fn fetch_certificates(
             if certificate_providers.contains(&CertSpotter) {
                 match config.certspotter {
                     None => {
-                        println!("Warning! No certspotter credentials found!")
+                        println!("Warning! No CertSpotter credentials found!")
                     }
                     Some(certspotter) => {
                         futures.push(Box::pin(certspotter_fetcher::fetch(
