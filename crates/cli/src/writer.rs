@@ -1,4 +1,5 @@
 use recon::DomainInfo;
+use std::collections::HashSet;
 
 pub trait Writer {
     fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error>;
@@ -29,12 +30,44 @@ impl Writer for CsvWriter {
     }
 }
 
-pub struct StdWriter {}
+pub struct PlainStdWriter {}
 
-impl Writer for StdWriter {
+impl Writer for PlainStdWriter {
+    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+        for domain in domains {
+            println!(
+                "{} {} {}",
+                domain.name,
+                domain.domain_type,
+                domain.ip_addresses.join(",")
+            )
+        }
+        Ok(())
+    }
+}
+
+pub struct DomainOnlyStdWriter {}
+
+impl Writer for DomainOnlyStdWriter {
     fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
         for domain in domains {
             println!("{}", domain.name)
+        }
+        Ok(())
+    }
+}
+
+pub struct IPOnlyStdWriter {}
+
+impl Writer for IPOnlyStdWriter {
+    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+        let uniq_ips: HashSet<String> = HashSet::from_iter(
+            domains
+                .into_iter()
+                .flat_map(|domain_info| domain_info.ip_addresses.clone()),
+        );
+        for ip in uniq_ips {
+            println!("{}", ip)
         }
         Ok(())
     }

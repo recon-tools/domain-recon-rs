@@ -1,12 +1,12 @@
 use std::fmt::Debug;
 use std::string::String;
 
-use clap::Parser;
+use clap::{arg, Parser};
 use console::style;
 
 use recon::{run, InputArgsBuilder};
 
-use crate::writer::{CsvWriter, StdWriter, Writer};
+use crate::writer::{CsvWriter, DomainOnlyStdWriter, IPOnlyStdWriter, PlainStdWriter, Writer};
 
 mod writer;
 
@@ -22,10 +22,24 @@ struct ReconArgs {
     #[clap(short, long, value_parser)]
     file: Option<String>,
 
-    /// Display results in plain form. Recommended, if the output is going to be provided as an
-    /// input for another application.
-    #[clap(short, long, action, default_value = "false")]
+    /// Display results in plain form (no banner, no color)
+    #[clap(
+        short,
+        long,
+        action,
+        default_value = "false",
+        conflicts_with = "domains_only",
+        conflicts_with = "ips_only"
+    )]
     plain: bool,
+
+    /// Display a plain list with domain names only
+    #[clap(long, action, default_value = "false", conflicts_with = "ips_only")]
+    domains_only: bool,
+
+    /// Display a plain list with unique IP addresses only
+    #[clap(long, action, default_value = "false")]
+    ips_only: bool,
 
     /// Save output to csv.
     #[clap(long, action, default_value = "false")]
@@ -80,7 +94,9 @@ static BANNER: &str = r#"
 async fn main() -> Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
 
-    if !args.plain {
+    let display_rich = !args.plain && !args.ips_only && !args.domains_only;
+
+    if display_rich {
         println!("{}", style(BANNER).cyan().bold());
     }
 
@@ -89,7 +105,7 @@ async fn main() -> Result<(), anyhow::Error> {
         .file(args.file)
         .use_system_resolver(args.use_system_resolver)
         .dns_resolvers(&args.dns_resolver)
-        .silent(args.plain)
+        .silent(!display_rich)
         .config(args.config)
         .number_of_parallel_requests(args.number_of_parallel_requests)
         .build();
@@ -97,8 +113,18 @@ async fn main() -> Result<(), anyhow::Error> {
     let result = run(input_args?).await?;
 
     let mut writers: Vec<Box<dyn Writer>> = vec![];
-    if args.plain {
-        writers.push(Box::new(StdWriter {}));
+    if !display_rich {
+        if args.plain {
+            writers.push(Box::new(PlainStdWriter {}));
+        }
+
+        if args.domains_only {
+            writers.push(Box::new(DomainOnlyStdWriter {}));
+        }
+
+        if args.ips_only {
+            writers.push(Box::new(IPOnlyStdWriter {}));
+        }
     }
 
     if args.csv {
