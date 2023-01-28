@@ -17,6 +17,8 @@ For more information, please read the blogpost: [https://ervinszilagyi.dev/artic
 domain-recon -d wikipedia.org -f words.txt
 ```
 
+**Note**: an example of [`words.txt`](words.txt) can be found here: [https://raw.githubusercontent.com/recon-tools/domain-recon-rs/main/words.txt](https://raw.githubusercontent.com/recon-tools/domain-recon-rs/main/words.txt)
+
 ![Example of usage GIF](images/example.gif)
 
 Currently, certificates are fetched from [crt.sh](https://crt.sh/) and [censys](https://search.censys.io/api). By default,
@@ -47,7 +49,7 @@ config.json
 $ domain-recon -h
 Extract domains and subdomains from certificates.
 
-Usage: domain-recon.exe [OPTIONS] --domain <DOMAIN>
+Usage: domain-recon [OPTIONS] --domain <DOMAIN>
 
 Options:
   -d, --domain <DOMAIN>
@@ -55,7 +57,11 @@ Options:
   -f, --file <FILE>
           Optional path to a words file used for expand wildcard domains. If there is no path provided, there will be no attempt to expand wildcard domains
   -p, --plain
-          Display results in plain form. Recommended, if the output is going to be provided as an input for another application
+          Display results in plain form (no banner, no color)
+      --domains-only
+          Display a plain list with domain names only
+      --ips-only
+          Display a plain list with unique IP addresses only
       --csv
           Save output to csv
       --use-system-resolver
@@ -72,19 +78,36 @@ Options:
           Print help information
   -V, --version
           Print version information
-PS E:\Projects\rust\domain-recon-rs>
 ```
 
-## Download the Tool
+## Download and Install
 
-We can download the executable for this tool from the releases page: [https://github.com/recon-tools/domain-recon-rs/releases](https://github.com/recon-tools/domain-recon-rs/releases)
+### Ubuntu/Debian
+
+- Add the following PPA:
+
+```
+curl -s --compressed -L "https://recon-tools.github.io/ppa/debian/KEY.gpg" | sudo apt-key add -
+sudo curl -s --compressed -L -o /etc/apt/sources.list.d/recon_tools.list "https://recon-tools/ppa/debian/recon_tools.list"
+sudo apt update
+```
+
+- Install using `apt-get`:
+
+```
+sudo apt install domain-recon
+```
+
+### MacOS/Windows
+
+We can download the executable from the releases page: [https://github.com/recon-tools/domain-recon-rs/releases](https://github.com/recon-tools/domain-recon-rs/releases)
 Make sure we choose the right executable for our OS/architecture.
 
 Or we can simply build the project.
 
 ## Building the Project
 
-This project requires Rust 1.64 or above.
+This project requires **Rust 1.64** or above.
 
 ```bash
 cd domain-recon-rs
