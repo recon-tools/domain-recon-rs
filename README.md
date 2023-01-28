@@ -17,6 +17,8 @@ For more information, please read the blogpost: [https://ervinszilagyi.dev/artic
 domain-recon -d wikipedia.org -f words.txt
 ```
 
+**Note**: an example of [`words.txt`](words.txt) can be found here: [https://raw.githubusercontent.com/recon-tools/domain-recon-rs/main/words.txt](https://raw.githubusercontent.com/recon-tools/domain-recon-rs/main/words.txt)
+
 ![Example of usage GIF](images/example.gif)
 
 Currently, certificates are fetched from [crt.sh](https://crt.sh/) and [censys](https://search.censys.io/api). By default,
