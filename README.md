@@ -86,7 +86,7 @@ Options:
 
 - Add the following PPA:
 
-```
+```bash
 curl -s --compressed -L "https://recon-tools.github.io/ppa/debian/KEY.gpg" | sudo apt-key add -
 sudo curl -s --compressed -L -o /etc/apt/sources.list.d/recon_tools.list "https://recon-tools/ppa/debian/recon_tools.list"
 sudo apt update
@@ -98,7 +98,16 @@ sudo apt update
 sudo apt install domain-recon
 ```
 
-### MacOS/Windows
+### MacOS
+
+Run the following commands:
+
+```bash
+brew tap recon-tools/homebrew-domain-recon
+brew install domain-recon-rs
+```
+
+### Windows
 
 We can download the executable from the releases page: [https://github.com/recon-tools/domain-recon-rs/releases](https://github.com/recon-tools/domain-recon-rs/releases)
 Make sure we choose the right executable for our OS/architecture.
