@@ -21,9 +21,10 @@ domain-recon -d wikipedia.org -f words.txt
 
 ![Example of usage GIF](images/example.gif)
 
-Currently, certificates are fetched from [crt.sh](https://crt.sh/) and [censys](https://search.censys.io/api). By default,
-`domain-recon` will use crt.sh only, censys and certspotter being additional options. In order to use censys or certspotter,
-we have to provide a configuration file, that contains our API credentials. `domain-recond` reads this information from 
+Currently, certificates are fetched from [crt.sh](https://crt.sh/), [censys](https://search.censys.io/api) 
+and [certspotter](https://sslmate.com/ct_search_api/). By default, `domain-recon` will use crt.sh only, 
+censys and certspotter being additional options. In order to use censys or certspotter, we have to provide a 
+configuration file, that contains our API credentials. `domain-recond` reads this information from 
 the `$HOME/.config/domain-recon/config.json` folder. The structure of this file should be as follows:
 
 config.json
