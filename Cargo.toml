@@ -5,7 +5,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Ervin Szilagyi"]
 edition = "2021"
 license = "MIT"
@@ -16,10 +16,18 @@ description = "Extract domains and subdomains from certificates."
 rust-version = "1.64.0"
 
 [workspace.dependencies]
-recon = { version = "1.0.0", path = "crates/recon" }
-tokio = { version = "1.0.2" }
-anyhow = { version = "1.0.66" }
-console = { version = "0.15.2" }
+recon = { version = "1.0.1", path = "crates/recon" }
+tokio = { version = "1.27.0" }
+serde_json = { version = "1.0.96" }
+serde = { version = "1.0.160" }
+reqwest = { version = "0.11.16" }
+futures = { version = "0.3.28" }
+async-std-resolver = { version = "0.22.0" }
+anyhow = { version = "1.0.70" }
+console = { version = "0.15.5" }
+addr = { version = "0.15.6" }
+home = { version = "0.5.4" }
+clap = {version = "4.2.1" }
 
 [profile.release]
 strip = "symbols"

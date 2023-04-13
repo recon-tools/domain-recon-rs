@@ -14,13 +14,15 @@ description.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.89"
-reqwest = { version = "0.11", features = ["json", "native-tls-vendored"] }
-futures = "0.3.24"
-async-std-resolver = "0.22.0"
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+reqwest = { workspace = true, features = ["json", "native-tls-vendored"] }
+futures = { workspace = true }
+async-std-resolver = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 console = { workspace = true }
-addr = "0.15.6"
-home = "0.5.4"
+addr = { workspace = true }
+home = { workspace = true }
+clap = { version = "4.2.1" }
+csv = { version = "1.2.1" }
