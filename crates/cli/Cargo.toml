@@ -13,8 +13,8 @@ description.workspace = true
 
 [dependencies]
 recon.workspace = true
-clap = { version = "4.0.18", features = ["derive"] }
-csv = "1.1.6"
+clap = { workspace = true, features = ["derive"] }
+csv = { vworkspace = true }
 tokio = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 console = { workspace = true }
