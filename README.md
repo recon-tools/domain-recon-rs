@@ -104,7 +104,7 @@ sudo apt install domain-recon
 Run the following commands:
 
 ```bash
-brew tap recon-tools/homebrew-domain-recon
+brew tap recon-tools/homebrew-recon-tools
 brew install domain-recon-rs
 ```
 
