@@ -72,6 +72,13 @@ jobs:
           name: windows-${{ matrix.platform.arch }}-${{ github.ref_name }}-bin
           path: target/${{ matrix.platform.target }}/release/domain-recon.exe
           if-no-files-found: error
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{secrets.HOMEBREW_GITHUB_API_TOKEN}}
+          tap: recon-tools/homebrew-recon-tools
+          formula: domain-recon-rs
+          force: false
 
   release-linux:
     runs-on: ubuntu-latest
