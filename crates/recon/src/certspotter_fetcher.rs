@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt::{Debug, Display};
@@ -23,7 +24,7 @@ struct CertSpotterCertificate {
 pub(crate) async fn fetch(
     domain: String,
     config: Vec<CertSpotterConfig>,
-) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
+) -> anyhow::Result<(Vec<String>, Vec<String>), anyhow::Error> {
     let response = get_certificates(&domain, &config[0].api_key).await?;
 
     let all_domains = response
@@ -41,7 +42,7 @@ pub(crate) async fn fetch(
 async fn get_certificates<S>(
     domain: S,
     api_key: S,
-) -> Result<Vec<CertSpotterCertificate>, reqwest::Error>
+) -> anyhow::Result<Vec<CertSpotterCertificate>, anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
@@ -53,11 +54,11 @@ async fn send_request<S>(
     client: &reqwest::Client,
     domain: S,
     api_token: S,
-) -> Result<Vec<CertSpotterCertificate>, reqwest::Error>
+) -> anyhow::Result<Vec<CertSpotterCertificate>, anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
-    client
+    let response = client
         .get("https://api.certspotter.com/v1/issuances")
         .query(&[
             ("domain", domain.as_ref()),
@@ -66,7 +67,20 @@ where
         ])
         .header("Authorization", format!("Bearer {}", api_token))
         .send()
-        .await?
-        .json::<Vec<CertSpotterCertificate>>()
-        .await
+        .await;
+
+    match response {
+        Ok(response_content) => {
+            if response_content.status().is_success() {
+                response_content
+                    .json::<Vec<CertSpotterCertificate>>()
+                    .await
+                    .map_err(anyhow::Error::from)
+            } else {
+                let code = response_content.status();
+                Err(anyhow!(format!("CertSpotter responded with error code {code}. You may want to try other provider!")))
+            }
+        }
+        Err(err_content) => Err(anyhow!(err_content)),
+    }
 }

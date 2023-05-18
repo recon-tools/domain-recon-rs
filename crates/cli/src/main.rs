@@ -91,7 +91,7 @@ static BANNER: &str = r#"
 "#;
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+async fn main() -> anyhow::Result<(), anyhow::Error> {
     let args: ReconArgs = ReconArgs::parse();
 
     let display_rich = !args.plain && !args.ips_only && !args.domains_only;

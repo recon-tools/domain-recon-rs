@@ -2,7 +2,7 @@ use recon::DomainInfo;
 use std::collections::HashSet;
 
 pub trait Writer {
-    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error>;
+    fn write(&self, domains: &Vec<DomainInfo>) -> anyhow::Result<(), anyhow::Error>;
 }
 
 pub struct CsvWriter {
@@ -16,7 +16,7 @@ impl CsvWriter {
 }
 
 impl Writer for CsvWriter {
-    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+    fn write(&self, domains: &Vec<DomainInfo>) -> anyhow::Result<(), anyhow::Error> {
         let mut writer = csv::Writer::from_path(&self.path)?;
         for domain in domains {
             writer.write_record(&[
@@ -33,7 +33,7 @@ impl Writer for CsvWriter {
 pub struct PlainStdWriter {}
 
 impl Writer for PlainStdWriter {
-    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+    fn write(&self, domains: &Vec<DomainInfo>) -> anyhow::Result<(), anyhow::Error> {
         for domain in domains {
             println!(
                 "{} {} {}",
@@ -49,7 +49,7 @@ impl Writer for PlainStdWriter {
 pub struct DomainOnlyStdWriter {}
 
 impl Writer for DomainOnlyStdWriter {
-    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+    fn write(&self, domains: &Vec<DomainInfo>) -> anyhow::Result<(), anyhow::Error> {
         for domain in domains {
             println!("{}", domain.name)
         }
@@ -60,7 +60,7 @@ impl Writer for DomainOnlyStdWriter {
 pub struct IPOnlyStdWriter {}
 
 impl Writer for IPOnlyStdWriter {
-    fn write(&self, domains: &Vec<DomainInfo>) -> Result<(), anyhow::Error> {
+    fn write(&self, domains: &Vec<DomainInfo>) -> anyhow::Result<(), anyhow::Error> {
         let uniq_ips: HashSet<String> = HashSet::from_iter(
             domains
                 .into_iter()

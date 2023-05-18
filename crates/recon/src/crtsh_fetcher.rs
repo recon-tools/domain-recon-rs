@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fmt::{Debug, Display};
@@ -16,7 +17,7 @@ struct Certificate {
     serial_number: String,
 }
 
-pub(crate) async fn fetch<S>(domain: S) -> Result<(Vec<String>, Vec<String>), reqwest::Error>
+pub(crate) async fn fetch<S>(domain: S) -> anyhow::Result<(Vec<String>, Vec<String>), anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
@@ -41,7 +42,7 @@ where
     Ok((wildcards, fqdns))
 }
 
-async fn get_certificates<S>(domain: S) -> Result<Vec<Certificate>, reqwest::Error>
+async fn get_certificates<S>(domain: S) -> anyhow::Result<Vec<Certificate>, anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
@@ -55,5 +56,20 @@ where
         ])
         .send()
         .await;
-    response?.json::<Vec<Certificate>>().await
+    match response {
+        Ok(response_content) => {
+            if response_content.status().is_success() {
+                response_content
+                    .json::<Vec<Certificate>>()
+                    .await
+                    .map_err(anyhow::Error::from)
+            } else {
+                let code = response_content.status();
+                Err(anyhow!(format!(
+                    "crt.sh responded with error code {code}. You may want to try other provider!"
+                )))
+            }
+        }
+        Err(err_content) => Err(anyhow!(err_content)),
+    }
 }
