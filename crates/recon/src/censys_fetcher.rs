@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -51,7 +52,7 @@ const MAX_PARALLEL_REQUESTS: usize = 10;
 pub(crate) async fn fetch(
     domain: String,
     config: Vec<CensysConfig>,
-) -> Result<(Vec<String>, Vec<String>), reqwest::Error> {
+) -> anyhow::Result<(Vec<String>, Vec<String>), anyhow::Error> {
     let CensysConfig { app_id, secret } = &config[0];
 
     let responses = get_certificates(&domain, app_id, secret).await?;
@@ -85,7 +86,7 @@ async fn get_certificates<S>(
     domain: S,
     api_id: S,
     secret: S,
-) -> Result<Vec<CensysResponse>, reqwest::Error>
+) -> anyhow::Result<Vec<CensysResponse>, anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
@@ -109,7 +110,7 @@ where
 
     let stream = futures::stream::iter(future_responses).buffer_unordered(MAX_PARALLEL_REQUESTS);
     let results = stream
-        .collect::<Vec<Result<CensysResponse, reqwest::Error>>>()
+        .collect::<Vec<Result<CensysResponse, anyhow::Error>>>()
         .await;
 
     let mut responses = vec![first_response];
@@ -128,18 +129,31 @@ async fn send_request<S>(
     request: Request,
     api_id: S,
     secret: S,
-) -> anyhow::Result<CensysResponse, reqwest::Error>
+) -> anyhow::Result<CensysResponse, anyhow::Error>
 where
     S: AsRef<str> + Display,
 {
-    client
+    let response = client
         .post("https://search.censys.io/api/v1/search/certificates")
         .json(&request)
         .basic_auth(api_id, Some(secret))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .send()
-        .await?
-        .json::<CensysResponse>()
-        .await
+        .await;
+
+    match response {
+        Ok(response_content) => {
+            if response_content.status().is_success() {
+                response_content
+                    .json::<CensysResponse>()
+                    .await
+                    .map_err(anyhow::Error::from)
+            } else {
+                let code = response_content.status();
+                Err(anyhow!(format!("CertSpotter responded with error code {code}. You may want to try other provider!")))
+            }
+        }
+        Err(err_content) => Err(anyhow!(err_content)),
+    }
 }

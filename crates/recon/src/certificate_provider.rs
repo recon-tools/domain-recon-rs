@@ -16,7 +16,7 @@ impl UnknownCertificateProvider {
 }
 
 impl std::fmt::Display for UnknownCertificateProvider {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> anyhow::Result<(), std::fmt::Error> {
         write!(fmt, "Unknown Certificate provider!")
     }
 }
@@ -31,7 +31,7 @@ pub(crate) enum CertificateProvider {
 impl FromStr for CertificateProvider {
     type Err = UnknownCertificateProvider;
 
-    fn from_str(input: &str) -> Result<CertificateProvider, Self::Err> {
+    fn from_str(input: &str) -> anyhow::Result<CertificateProvider, Self::Err> {
         match input {
             "certsh" => Ok(CertificateProvider::CertSh),
             "censys" => Ok(CertificateProvider::Censys),

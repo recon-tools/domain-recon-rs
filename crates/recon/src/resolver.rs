@@ -13,7 +13,7 @@ impl UnknownDNSResolver {
 }
 
 impl std::fmt::Display for UnknownDNSResolver {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> anyhow::Result<(), std::fmt::Error> {
         write!(fmt, "Unknown DNS resolver!")
     }
 }
@@ -28,7 +28,7 @@ pub(crate) enum DNSResolver {
 impl FromStr for DNSResolver {
     type Err = UnknownDNSResolver;
 
-    fn from_str(input: &str) -> Result<DNSResolver, Self::Err> {
+    fn from_str(input: &str) -> anyhow::Result<DNSResolver, Self::Err> {
         match input {
             "google" => Ok(DNSResolver::Google),
             "cloudflare" => Ok(DNSResolver::CloudFlare),

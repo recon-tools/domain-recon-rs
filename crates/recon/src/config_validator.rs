@@ -1,14 +1,14 @@
 use crate::DomainReconConfig;
-use anyhow::{anyhow, Error};
+use anyhow::anyhow;
 
 pub(crate) trait ConfigValidator {
-    fn validate(&self, config: &DomainReconConfig) -> Result<(), Error>;
+    fn validate(&self, config: &DomainReconConfig) -> anyhow::Result<(), anyhow::Error>;
 }
 
 pub(crate) struct CensysConfigValidator {}
 
 impl ConfigValidator for CensysConfigValidator {
-    fn validate(&self, config: &DomainReconConfig) -> Result<(), Error> {
+    fn validate(&self, config: &DomainReconConfig) -> anyhow::Result<(), anyhow::Error> {
         match &config.censys {
             None => {
                 return Err(anyhow!(
@@ -28,7 +28,7 @@ impl ConfigValidator for CensysConfigValidator {
 pub(crate) struct CertSpotterConfigValidator {}
 
 impl ConfigValidator for CertSpotterConfigValidator {
-    fn validate(&self, config: &DomainReconConfig) -> Result<(), Error> {
+    fn validate(&self, config: &DomainReconConfig) -> anyhow::Result<(), anyhow::Error> {
         match &config.certspotter {
             None => {
                 return Err(anyhow!(
@@ -48,7 +48,7 @@ impl ConfigValidator for CertSpotterConfigValidator {
 pub(crate) struct CrtShConfigValidator {}
 
 impl ConfigValidator for CrtShConfigValidator {
-    fn validate(&self, _: &DomainReconConfig) -> Result<(), Error> {
+    fn validate(&self, _: &DomainReconConfig) -> anyhow::Result<(), anyhow::Error> {
         // No config required for CrtSh
         Ok(())
     }

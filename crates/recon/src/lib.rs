@@ -15,7 +15,6 @@ use async_std_resolver::{
 use console::{style, Emoji};
 use futures::future::join_all;
 use futures::{FutureExt, StreamExt};
-use reqwest::Error;
 use tokio::fs::{read_to_string, File};
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 
@@ -162,7 +161,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
         .collect())
 }
 
-async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::Error> {
+async fn read_config<P: AsRef<Path>>(path: P) -> anyhow::Result<DomainReconConfig, io::Error> {
     let contents = read_to_string(path).await?;
     let config = serde_json::from_str::<DomainReconConfig>(&*contents)?;
     Ok(config)
@@ -173,7 +172,7 @@ async fn read_config<P: AsRef<Path>>(path: P) -> Result<DomainReconConfig, io::E
 fn validate_config(
     config: &Option<DomainReconConfig>,
     providers: &Vec<CertificateProvider>,
-) -> Result<(), anyhow::Error> {
+) -> anyhow::Result<(), anyhow::Error> {
     match config {
         None => {
             if providers
@@ -210,13 +209,14 @@ async fn fetch_certificates(
     certificate_providers: &Vec<CertificateProvider>,
     domain: String,
     optional_config: Option<DomainReconConfig>,
-) -> Result<(HashSet<String>, HashSet<String>), Error> {
+) -> anyhow::Result<(HashSet<String>, HashSet<String>), anyhow::Error> {
     type PinFutureObj<Output> = Pin<Box<dyn Future<Output = Output>>>;
 
     let mut wildcards = HashSet::new();
     let mut fqdns = HashSet::new();
 
-    let mut futures: Vec<PinFutureObj<Result<(Vec<String>, Vec<String>), Error>>> = Vec::new();
+    let mut futures: Vec<PinFutureObj<anyhow::Result<(Vec<String>, Vec<String>), anyhow::Error>>> =
+        Vec::new();
 
     if certificate_providers.contains(&CertificateProvider::CertSh) {
         futures.push(Box::pin(crtsh_fetcher::fetch(domain.clone())));
@@ -246,7 +246,7 @@ async fn fetch_certificates(
                 fqdns.extend(f);
             }
             Err(e) => {
-                println!("Could not fetch for {}", e);
+                println!("Could not fetch from provider. Error: {}", e);
             }
         };
     }
@@ -257,7 +257,7 @@ async fn fetch_certificates(
 async fn build_resolver(
     use_system_resolver: bool,
     dns_resolvers: &Vec<DNSResolver>,
-) -> Result<AsyncStdResolver, ResolveError> {
+) -> anyhow::Result<AsyncStdResolver, ResolveError> {
     if use_system_resolver {
         return resolver_from_system_conf().await;
     }
@@ -290,7 +290,7 @@ async fn build_resolver(
     resolver
 }
 
-async fn read_words<P: AsRef<Path>>(words_path: P) -> Result<HashSet<String>, io::Error> {
+async fn read_words<P: AsRef<Path>>(words_path: P) -> anyhow::Result<HashSet<String>, io::Error> {
     let mut lines = BufReader::new(File::open(words_path).await?).lines();
     let mut words: HashSet<String> = HashSet::new();
     while let Some(line) = lines.next_line().await? {
@@ -303,7 +303,7 @@ async fn expand_wildcards(
     wildcards: &HashSet<String>,
     fqdns: &HashSet<String>,
     words: &HashSet<String>,
-) -> Result<HashSet<String>, io::Error> {
+) -> anyhow::Result<HashSet<String>, io::Error> {
     let mut potential_domains: HashSet<String> = HashSet::new();
     for word in words {
         potential_domains.extend(
@@ -323,7 +323,7 @@ async fn get_resolvable_domains(
     silent: bool,
     number_of_parallel_request: usize,
 ) -> Vec<LookupIp> {
-    let mut result: Vec<Result<LookupIp, ResolveError>> = vec![];
+    let mut result: Vec<anyhow::Result<LookupIp, ResolveError>> = vec![];
 
     // Build chunks of records in order to avoid having to many opened connections.
     let futures = domains
