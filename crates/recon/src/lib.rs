@@ -102,6 +102,18 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
     let resolver =
         build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
 
+    if wildcards.is_empty() && fqdns.is_empty() {
+        if !input_args.silent {
+            println!(
+                "\n{} {}{}",
+                style(format!("[!/{}]", steps)).bold().dim(),
+                CLIP,
+                style("No domains found. Closing...").bold()
+            );
+        }
+        return Ok(vec![]);
+    }
+
     if !input_args.silent {
         println!(
             "\n{} {}{}",
