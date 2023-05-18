@@ -111,7 +111,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
                 style("No domains found. Closing...").bold()
             );
         }
-        return Ok(vec![])
+        return Ok(vec![]);
     }
 
     if !input_args.silent {

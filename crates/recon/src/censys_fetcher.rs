@@ -151,7 +151,9 @@ where
                     .map_err(anyhow::Error::from)
             } else {
                 let code = response_content.status();
-                Err(anyhow!(format!("Censys responded with error code {code}. You may want to try other provider!")))
+                Err(anyhow!(format!(
+                    "Censys responded with error code {code}. You may want to try other provider!"
+                )))
             }
         }
         Err(err_content) => Err(anyhow!(err_content)),
