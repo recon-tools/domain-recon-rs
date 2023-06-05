@@ -52,7 +52,7 @@ struct CensysResponse {
 struct CensysErrorResponse {
     status: String,
     error: String,
-    error_type: String
+    error_type: String,
 }
 
 const MAX_PARALLEL_REQUESTS: usize = 10;
@@ -159,9 +159,7 @@ where
                     .map_err(anyhow::Error::from)
             } else {
                 let code = response_content.status();
-                let error_response = response_content
-                    .json::<CensysErrorResponse>()
-                    .await?;
+                let error_response = response_content.json::<CensysErrorResponse>().await?;
                 let error_massage = error_response.error;
                 Err(anyhow!(format!(
                     "Censys responded with HTTP code \"{code}\" and with message of: \"{error_massage}\"\n\

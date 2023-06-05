@@ -78,8 +78,10 @@ where
                     .map_err(anyhow::Error::from)
             } else {
                 let code = response_content.status();
-                Err(anyhow!(format!("CertSpotter responded with HTTP code \"{code}\".\n\
-                 You may want to try other provider!")))
+                Err(anyhow!(format!(
+                    "CertSpotter responded with HTTP code \"{code}\".\n\
+                 You may want to try other provider!"
+                )))
             }
         }
         Err(err_content) => Err(anyhow!(err_content)),
