@@ -27,20 +27,25 @@ RUN ls -lart
 
 FROM debian:latest as dist
 
+ARG VERSION=1.3.0
+
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
 WORKDIR /debpkgs
 
-RUN mkdir -p domain-recon_1.0.0_amd64/DEBIAN && \
-    mkdir -p domain-recon_1.0.0_amd64/usr/bin
+RUN mkdir -p domain-recon_${VERSION}_amd64/DEBIAN && \
+    mkdir -p domain-recon_${VERSION}_amd64/usr/bin
 
-COPY control domain-recon_1.0.0_amd64/DEBIAN
+COPY control domain-recon_${VERSION}_amd64/DEBIAN
 
-COPY --from=builder /domain-recon-rs/target/x86_64-unknown-linux-musl/release/domain-recon ./domain-recon_1.0.0_amd64/usr/bin/domain-recon
+COPY --from=builder /domain-recon-rs/target/x86_64-unknown-linux-musl/release/domain-recon ./domain-recon_${VERSION}_amd64/usr/bin/domain-recon
 
-RUN dpkg-deb --build domain-recon_1.0.0_amd64
+RUN dpkg-deb --build domain-recon_${VERSION}_amd64
 
 FROM scratch as artifact
-COPY --from=dist /debpkgs/domain-recon_1.0.0_amd64.deb .
+
+ARG VERSION=1.3.0
+
+COPY --from=dist /debpkgs/domain-recon_${VERSION}_amd64.deb .
 
