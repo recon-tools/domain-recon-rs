@@ -66,7 +66,8 @@ where
             } else {
                 let code = response_content.status();
                 Err(anyhow!(format!(
-                    "crt.sh responded with error code {code}. You may want to try other provider!"
+                    "crt.sh responded with HTTP code \"{code}\".\n\
+                     You may want to try other provider!"
                 )))
             }
         }
