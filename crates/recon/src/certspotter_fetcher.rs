@@ -21,6 +21,13 @@ struct CertSpotterCertificate {
     revoked: bool,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct CertSpotterError {
+    code: String,
+    message: String,
+}
+
 pub(crate) async fn fetch(
     domain: String,
     config: Vec<CertSpotterConfig>,
@@ -78,7 +85,12 @@ where
                     .map_err(anyhow::Error::from)
             } else {
                 let code = response_content.status();
-                Err(anyhow!(format!("CertSpotter responded with error code {code}. You may want to try other provider!")))
+                let error_response = response_content.json::<CertSpotterError>().await?;
+                let error_massage = error_response.message;
+                Err(anyhow!(format!(
+                    "CertSpotter responded with HTTP code \"{code}\" and with message of: \"{error_massage}\"\n\
+                    You may want to try other provider!"
+                )))
             }
         }
         Err(err_content) => Err(anyhow!(err_content)),

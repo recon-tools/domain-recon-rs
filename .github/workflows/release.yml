@@ -35,13 +35,6 @@ jobs:
           name: apple-darwin-${{ github.ref_name }}-bin
           path: target/release/domain-recon
           if-no-files-found: error
-      - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@v3
-        with:
-          token: ${{secrets.HOMEBREW_GITHUB_API_TOKEN}}
-          tap: recon-tools/homebrew-recon-tools
-          formula: domain-recon-rs
-          force: false
 
   release-windows:
     runs-on: windows-latest
@@ -172,3 +165,11 @@ jobs:
           files: target/upload/*
           prerelease: ${{ contains(github.ref_name, '-pre') }}
           generate_release_notes: true
+
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{secrets.HOMEBREW_GITHUB_API_TOKEN}}
+          tap: recon-tools/homebrew-recon-tools
+          formula: domain-recon-rs
+          force: false
