@@ -14,7 +14,7 @@ description.workspace = true
 [dependencies]
 recon.workspace = true
 clap = { workspace = true, features = ["derive"] }
-csv = { vworkspace = true }
+csv = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 anyhow = { workspace = true }
 console = { workspace = true }
