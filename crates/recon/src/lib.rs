@@ -99,8 +99,8 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
 
     let (wildcards, fqdns) =
         fetch_certificates(&input_args.certificate_providers, input_args.domain, config).await?;
-    let resolver =
-        build_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
+    let dns_resolver =
+        build_dns_resolver(input_args.use_system_resolver, &input_args.dns_resolvers).await?;
 
     if wildcards.is_empty() && fqdns.is_empty() {
         if !input_args.silent {
@@ -125,7 +125,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
 
     let mut resolvable = get_resolvable_domains(
         &fqdns,
-        &resolver,
+        &dns_resolver,
         input_args.silent,
         input_args.number_of_parallel_requests,
     )
@@ -148,7 +148,7 @@ pub async fn run(input_args: InputArgs) -> anyhow::Result<Vec<DomainInfo>> {
             resolvable.extend(
                 get_resolvable_domains(
                     &domains,
-                    &resolver,
+                    &dns_resolver,
                     input_args.silent,
                     input_args.number_of_parallel_requests,
                 )
@@ -266,7 +266,7 @@ async fn fetch_certificates(
     Ok((wildcards, fqdns))
 }
 
-async fn build_resolver(
+async fn build_dns_resolver(
     use_system_resolver: bool,
     dns_resolvers: &Vec<DNSResolver>,
 ) -> anyhow::Result<AsyncStdResolver, ResolveError> {
@@ -299,7 +299,7 @@ async fn build_resolver(
 
     let resolver_cfg = config::ResolverOpts::default();
     let resolver = resolver(dns_cfg, resolver_cfg).await;
-    resolver
+    Ok(resolver)
 }
 
 async fn read_words<P: AsRef<Path>>(words_path: P) -> anyhow::Result<HashSet<String>, io::Error> {
@@ -331,7 +331,7 @@ async fn expand_wildcards(
 
 async fn get_resolvable_domains(
     domains: &HashSet<String>,
-    resolver: &AsyncStdResolver,
+    dns_resolver: &AsyncStdResolver,
     silent: bool,
     number_of_parallel_request: usize,
 ) -> Vec<LookupIp> {
@@ -342,7 +342,7 @@ async fn get_resolvable_domains(
         .into_iter()
         .filter(|str| parse_domain_name(str).is_ok())
         .map(|domain| {
-            resolver.lookup_ip(domain).then(|r| {
+            dns_resolver.lookup_ip(domain).then(|r| {
                 // Display results as soon as they appear
                 future::ready(match r {
                     Ok(ip) => {
