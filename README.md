@@ -117,7 +117,7 @@ Or we can simply build the project.
 
 ## Building the Project
 
-This project requires **Rust 1.64** or above.
+This project requires **Rust 1.83** or above.
 
 ```bash
 cd domain-recon-rs
