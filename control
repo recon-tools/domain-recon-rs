@@ -1,6 +1,6 @@
 Package: domain-recon
-Version: 1.0.0
-Architecture: amd64
+Version: {{VERSION}}
+Architecture: {{ARCH}}
 Essential: no
 Priority: optional
 Depends:
